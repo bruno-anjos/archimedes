@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/bruno-anjos/archimedes/api"
 	"github.com/bruno-anjos/solution-utils/http_utils"
 )
 
@@ -20,29 +21,19 @@ const (
 	changeInstanceStateName      = "CHANGE_INSTANCE_STATE"
 )
 
-// Paths
-const (
-	PrefixPath = "/archimedes"
-
-	ServicesPath        = "/services"
-	ServicePath         = "/services/%s"
-	ServiceInstancePath = "/services/%s/%s"
-)
-
 // Path variables
 const (
 	serviceIdPathVar  = "serviceId"
 	instanceIdPathVar = "instanceId"
-	statusQueryVar    = "status"
 )
 
 var (
 	_serviceIdPathVarFormatted  = fmt.Sprintf(http_utils.PathVarFormat, serviceIdPathVar)
 	_instanceIdPathVarFormatted = fmt.Sprintf(http_utils.PathVarFormat, instanceIdPathVar)
 
-	servicesRoute        = ServicesPath
-	serviceRoute         = fmt.Sprintf(ServicePath, _serviceIdPathVarFormatted)
-	serviceInstanceRoute = fmt.Sprintf(ServiceInstancePath, _serviceIdPathVarFormatted, _instanceIdPathVarFormatted)
+	servicesRoute        = api.ServicesPath
+	serviceRoute         = fmt.Sprintf(api.ServicePath, _serviceIdPathVarFormatted)
+	serviceInstanceRoute = fmt.Sprintf(api.ServiceInstancePath, _serviceIdPathVarFormatted, _instanceIdPathVarFormatted)
 )
 
 var routes = []http_utils.Route{
@@ -50,7 +41,7 @@ var routes = []http_utils.Route{
 		Name:        changeInstanceStateName,
 		Method:      http.MethodPut,
 		Pattern:     serviceInstanceRoute,
-		QueryParams: []string{statusQueryVar, fmt.Sprintf(http_utils.PathVarFormat, statusQueryVar)},
+		QueryParams: []string{api.StatusQueryVar, fmt.Sprintf(http_utils.PathVarFormat, api.StatusQueryVar)},
 		HandlerFunc: changeInstanceStateHandler,
 	},
 
