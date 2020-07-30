@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"math/rand"
+	"net/http"
 	"time"
 
 	"github.com/bruno-anjos/solution-utils/http_utils"
