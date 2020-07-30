@@ -2,9 +2,11 @@ package main
 
 import (
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
+	"github.com/bruno-anjos/archimedes/api"
 	"github.com/bruno-anjos/solution-utils/http_utils"
 	"github.com/gorilla/mux"
 	log "github.com/sirupsen/logrus"
@@ -33,7 +35,7 @@ func init() {
 }
 
 func instanceHeartbeatChecker() {
-	ticker := time.NewTicker(time.Duration(heartbeatCheckerTimeout) * time.Millisecond)
+	ticker := time.NewTicker(heartbeatCheckerTimeout * time.Millisecond)
 
 	var toDelete []string
 	for {
@@ -74,7 +76,7 @@ func registerServiceHandler(w http.ResponseWriter, r *http.Request) {
 
 	serviceId := http_utils.ExtractPathVar(r, serviceIdPathVar)
 
-	serviceDTO := ServiceDTO{}
+	serviceDTO := api.ServiceDTO{}
 	http_utils.DecodeJSONRequestBody(r, &serviceDTO)
 
 	service := &Service{
@@ -119,12 +121,15 @@ func registerServiceInstanceHandler(w http.ResponseWriter, r *http.Request) {
 
 	instanceId := http_utils.ExtractPathVar(r, instanceIdPathVar)
 
-	instanceDTO := InstanceDTO{}
+	instanceDTO := api.InstanceDTO{}
 	http_utils.DecodeJSONRequestBody(r, &instanceDTO)
+
+	ip := strings.Split(r.RemoteAddr, ",")[0]
 
 	instance := &Instance{
 		Id:          instanceId,
 		Service:     service,
+		Ip:          ip,
 		InstanceDTO: &instanceDTO,
 	}
 
@@ -198,7 +203,7 @@ func heartbeatServiceInstanceHandler(w http.ResponseWriter, r *http.Request) {
 func getAllServicesHandler(w http.ResponseWriter, _ *http.Request) {
 	log.Debug("handling request in getAllServices handler")
 
-	var services map[string]*ServiceDTO
+	var services map[string]*api.ServiceDTO
 
 	servicesMap.Range(func(key, value interface{}) bool {
 		serviceId := key.(typeServicesMapKey)
@@ -222,7 +227,7 @@ func getAllServiceInstancesHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	service := value.(typeServicesMapValue)
-	var instances map[string]*InstanceDTO
+	var instances map[string]*api.InstanceDTO
 
 	service.InstancesMap.Range(func(key, value interface{}) bool {
 		instanceId := key.(typeInstancesMapKey)
@@ -257,32 +262,20 @@ func getServiceInstanceHandler(w http.ResponseWriter, r *http.Request) {
 	http_utils.SendJSONReplyOK(w, value.(typeInstancesMapValue))
 }
 
-const (
-	StatusOutOfService = "OUT_OF_SERVICE"
-	StatusUp           = "UP"
-)
-
 var (
-	allowedStatuses = []string{StatusOutOfService, StatusUp}
+	allowedStatuses = map[string]struct{}{api.StatusOutOfService: {}, api.StatusUp: {}}
 )
 
 func changeInstanceStateHandler(w http.ResponseWriter, r *http.Request) {
 	log.Debug("handling request in changeInstanceState handler")
 
 	vars := mux.Vars(r)
-	status := vars[statusQueryVar]
+	status := vars[api.StatusQueryVar]
 
 	log.Debugf("status query param: %s", status)
 
-	valid := false
-	for _, allowedStatus := range allowedStatuses {
-		if status == allowedStatus {
-			valid = true
-			break
-		}
-	}
-
-	if !valid {
+	_, ok := allowedStatuses[status]
+	if !ok {
 		w.WriteHeader(http.StatusBadRequest)
 	}
 
