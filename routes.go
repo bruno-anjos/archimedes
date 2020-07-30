@@ -10,13 +10,13 @@ import (
 // Route names
 const (
 	registerServiceName          = "REGISTER_SERVICE"
+	deleteServiceName            = "DELETE_SERVICE"
+	registerServiceInstanceName  = "REGISTER_SERVICE"
 	deleteServiceInstanceName    = "DELETE_SERVICE_INSTANCE"
 	heartbeatServiceInstanceName = "HEARTBEAT_SERVICE_INSTANCE"
 	getAllServicesName           = "GET_ALL_SERVICES"
 	getAllServiceInstancesName   = "GET_ALL_SERVICE_INSTANCES"
-	getAllInstancesName          = "GET_ALL_INSTANCES"
 	getServiceInstanceName       = "GET_SERVICE_INSTANCE"
-	getInstanceName              = "GET_INSTANCE"
 	changeInstanceStateName      = "CHANGE_INSTANCE_STATE"
 )
 
@@ -27,9 +27,6 @@ const (
 	ServicesPath        = "/services"
 	ServicePath         = "/services/%s"
 	ServiceInstancePath = "/services/%s/%s"
-
-	InstancesPath = "/instances"
-	InstancePath  = "/instances/%s"
 )
 
 // Path variables
@@ -46,8 +43,6 @@ var (
 	servicesRoute        = ServicesPath
 	serviceRoute         = fmt.Sprintf(ServicePath, _serviceIdPathVarFormatted)
 	serviceInstanceRoute = fmt.Sprintf(ServiceInstancePath, _serviceIdPathVarFormatted, _instanceIdPathVarFormatted)
-	instancesRoute       = InstancesPath
-	instanceRoute        = fmt.Sprintf(InstancePath, _instanceIdPathVarFormatted)
 )
 
 var routes = []http_utils.Route{
@@ -64,6 +59,20 @@ var routes = []http_utils.Route{
 		Method:      http.MethodPost,
 		Pattern:     serviceRoute,
 		HandlerFunc: registerServiceHandler,
+	},
+
+	{
+		Name:        deleteServiceName,
+		Method:      http.MethodDelete,
+		Pattern:     serviceRoute,
+		HandlerFunc: deleteServiceHandler,
+	},
+
+	{
+		Name:        registerServiceInstanceName,
+		Method:      http.MethodPost,
+		Pattern:     serviceInstanceRoute,
+		HandlerFunc: registerServiceInstanceHandler,
 	},
 
 	{
@@ -95,23 +104,9 @@ var routes = []http_utils.Route{
 	},
 
 	{
-		Name:        getAllInstancesName,
-		Method:      http.MethodGet,
-		Pattern:     instancesRoute,
-		HandlerFunc: getAllInstancesHandler,
-	},
-
-	{
 		Name:        getServiceInstanceName,
 		Method:      http.MethodGet,
 		Pattern:     serviceInstanceRoute,
 		HandlerFunc: getServiceInstanceHandler,
-	},
-
-	{
-		Name:        getInstanceName,
-		Method:      http.MethodGet,
-		Pattern:     instanceRoute,
-		HandlerFunc: getInstanceHandler,
 	},
 }
