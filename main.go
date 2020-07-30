@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/bruno-anjos/archimedes/api"
 	"github.com/bruno-anjos/solution-utils/http_utils"
 	log "github.com/sirupsen/logrus"
 )
@@ -32,7 +33,7 @@ func main() {
 
 	addr := fmt.Sprintf("%s:%d", host, Port)
 
-	r := http_utils.NewRouter(PrefixPath, routes)
+	r := http_utils.NewRouter(api.PrefixPath, routes)
 
 	log.Infof("Starting %s server in port %d...\n", serviceName, Port)
 	log.Fatal(http.ListenAndServe(addr, r))
