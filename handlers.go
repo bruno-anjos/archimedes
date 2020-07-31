@@ -1,12 +1,14 @@
 package main
 
 import (
+	"encoding/json"
 	"net/http"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/bruno-anjos/archimedes/api"
+	scheduler "github.com/bruno-anjos/scheduler/api"
 	"github.com/bruno-anjos/solution-utils/http_utils"
 	"github.com/gorilla/mux"
 	log "github.com/sirupsen/logrus"
@@ -21,21 +23,32 @@ type (
 )
 
 const (
-	// in milliseconds
-	heartbeatCheckerTimeout = 3000
+	// in seconds
+	httpClientTimeout       = 10
+	heartbeatCheckerTimeout = 10
+	initTimeout             = 20
 )
 
 var (
-	servicesMap   = sync.Map{}
-	heartbeatsMap = sync.Map{}
+	httpClient *http.Client
+
+	servicesMap   sync.Map
+	heartbeatsMap sync.Map
 )
 
 func init() {
+	httpClient = &http.Client{
+		Timeout: httpClientTimeout * time.Second,
+	}
+
+	servicesMap = sync.Map{}
+	heartbeatsMap = sync.Map{}
+
 	go instanceHeartbeatChecker()
 }
 
 func instanceHeartbeatChecker() {
-	ticker := time.NewTicker(heartbeatCheckerTimeout * time.Millisecond)
+	ticker := time.NewTicker(heartbeatCheckerTimeout * time.Second)
 
 	var toDelete []string
 	for {
@@ -56,18 +69,57 @@ func instanceHeartbeatChecker() {
 					if ok {
 						service := serviceValue.(typeServicesMapValue)
 						service.InstancesMap.Delete(instanceId)
+					} else {
+						log.Debugf("did not find instance %s in service %s, assuming it was already removed",
+							instanceId, pairServiceStatus.ServiceId)
 					}
 
 					toDelete = append(toDelete, instanceId)
+					log.Debugf("removing instance %s", instanceId)
+				} else {
+					pairServiceStatus.IsUp = false
+					pairServiceStatus.Mutex.Unlock()
 				}
 
 				return true
 			})
 		}
 
-		for instanceId := range toDelete {
+		for _, instanceId := range toDelete {
+			log.Debugf("removing %s instance from expected hearbeats map", instanceId)
 			heartbeatsMap.Delete(instanceId)
 		}
+	}
+}
+
+func cleanUnresponsiveInstance(serviceId, instanceId string, alive <-chan struct{}) {
+	timer := time.NewTimer(initTimeout * time.Second)
+
+	select {
+	case <-alive:
+		log.Debugf("instance %s is up", instanceId)
+		return
+	case <-timer.C:
+		value, ok := servicesMap.Load(serviceId)
+		if !ok {
+			log.Debugf("service %s was removed meanwhile, ignoring", serviceId)
+			return
+		}
+
+		log.Debugf("instance %s never reported, deleting it from service %s", instanceId, serviceId)
+		service := value.(typeServicesMapValue)
+		service.InstancesMap.Delete(instanceId)
+
+		log.Debugf("warning scheduler to remove instance %s", instanceId)
+		instancePath := scheduler.GetInstancePath(instanceId)
+		req := http_utils.BuildRequest(http.MethodDelete, scheduler.DefaultHostPort, instancePath, nil)
+		status, _ := http_utils.DoRequest(httpClient, req, nil)
+		if status != http.StatusOK {
+			log.Warnf("while trying to remove instance %s after timeout, scheduler returned code %d",
+				instanceId, status)
+		}
+
+		return
 	}
 }
 
@@ -77,7 +129,12 @@ func registerServiceHandler(w http.ResponseWriter, r *http.Request) {
 	serviceId := http_utils.ExtractPathVar(r, serviceIdPathVar)
 
 	serviceDTO := api.ServiceDTO{}
-	http_utils.DecodeJSONRequestBody(r, &serviceDTO)
+	err := json.NewDecoder(r.Body).Decode(&serviceDTO)
+	if err != nil {
+		log.Error(err)
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
 
 	service := &Service{
 		Id:           serviceId,
@@ -90,6 +147,8 @@ func registerServiceHandler(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusConflict)
 		return
 	}
+
+	log.Debugf("added service %s", serviceId)
 }
 
 func deleteServiceHandler(w http.ResponseWriter, r *http.Request) {
@@ -103,6 +162,8 @@ func deleteServiceHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	servicesMap.Delete(serviceId)
+
+	log.Debugf("deleted service %s", serviceId)
 }
 
 func registerServiceInstanceHandler(w http.ResponseWriter, r *http.Request) {
@@ -111,7 +172,6 @@ func registerServiceInstanceHandler(w http.ResponseWriter, r *http.Request) {
 	serviceId := http_utils.ExtractPathVar(r, serviceIdPathVar)
 
 	value, ok := servicesMap.Load(serviceId)
-
 	if !ok {
 		w.WriteHeader(http.StatusNotFound)
 		return
@@ -122,15 +182,22 @@ func registerServiceInstanceHandler(w http.ResponseWriter, r *http.Request) {
 	instanceId := http_utils.ExtractPathVar(r, instanceIdPathVar)
 
 	instanceDTO := api.InstanceDTO{}
-	http_utils.DecodeJSONRequestBody(r, &instanceDTO)
+	err := json.NewDecoder(r.Body).Decode(&instanceDTO)
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
 
 	ip := strings.Split(r.RemoteAddr, ",")[0]
 
+	initChan := make(chan struct{})
 	instance := &Instance{
 		Id:          instanceId,
 		Service:     service,
 		Ip:          ip,
 		InstanceDTO: &instanceDTO,
+		Initialized: false,
+		InitChan:    initChan,
 	}
 
 	_, loaded := service.InstancesMap.LoadOrStore(instanceId, instance)
@@ -138,6 +205,10 @@ func registerServiceInstanceHandler(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusConflict)
 		return
 	}
+
+	go cleanUnresponsiveInstance(serviceId, instanceId, initChan)
+
+	log.Debugf("added instance %s to instances waiting for heartbeat", instanceId)
 }
 
 func deleteServiceInstanceHandler(w http.ResponseWriter, r *http.Request) {
@@ -161,6 +232,8 @@ func deleteServiceInstanceHandler(w http.ResponseWriter, r *http.Request) {
 
 	instancesFromService.InstancesMap.Delete(instanceId)
 	heartbeatsMap.Delete(instanceId)
+
+	log.Debugf("deleted instance %s from service %s", instanceId, serviceId)
 }
 
 func heartbeatServiceInstanceHandler(w http.ResponseWriter, r *http.Request) {
@@ -178,32 +251,39 @@ func heartbeatServiceInstanceHandler(w http.ResponseWriter, r *http.Request) {
 	service := value.(typeServicesMapValue)
 	instanceId := http_utils.ExtractPathVar(r, instanceIdPathVar)
 
-	_, ok = service.InstancesMap.Load(instanceId)
+	value, ok = service.InstancesMap.Load(instanceId)
 	if !ok {
 		log.Warnf("ignoring heartbeat from instance %s since it wasn't registered", instanceId)
+		w.WriteHeader(http.StatusNotFound)
 		return
 	}
 
-	value, ok = heartbeatsMap.Load(instanceId)
-	if !ok {
-		pairServiceStatus := &PairServiceIdStatus{
-			ServiceId: serviceId,
-			IsUp:      true,
-			Mutex:     &sync.Mutex{},
-		}
-		heartbeatsMap.Store(instanceId, pairServiceStatus)
-	} else {
-		pairServiceStatus := value.(typeHeartbeatsMapValue)
+	instance := value.(typeInstancesMapValue)
+	if !instance.Initialized {
+		instance.Initialized = true
+		close(instance.InitChan)
+	}
+
+	pairServiceStatus := &PairServiceIdStatus{
+		ServiceId: serviceId,
+		IsUp:      true,
+		Mutex:     &sync.Mutex{},
+	}
+	value, loaded := heartbeatsMap.LoadOrStore(instanceId, pairServiceStatus)
+	if loaded {
+		pairServiceStatus = value.(typeHeartbeatsMapValue)
 		pairServiceStatus.Mutex.Lock()
 		pairServiceStatus.IsUp = true
 		pairServiceStatus.Mutex.Unlock()
 	}
+
+	log.Debugf("got heartbeat from instance %s", instanceId)
 }
 
 func getAllServicesHandler(w http.ResponseWriter, _ *http.Request) {
 	log.Debug("handling request in getAllServices handler")
 
-	var services map[string]*api.ServiceDTO
+	services := map[string]*api.ServiceDTO{}
 
 	servicesMap.Range(func(key, value interface{}) bool {
 		serviceId := key.(typeServicesMapKey)
@@ -227,7 +307,7 @@ func getAllServiceInstancesHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	service := value.(typeServicesMapValue)
-	var instances map[string]*api.InstanceDTO
+	instances := map[string]*api.InstanceDTO{}
 
 	service.InstancesMap.Range(func(key, value interface{}) bool {
 		instanceId := key.(typeInstancesMapKey)
