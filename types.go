@@ -22,6 +22,8 @@ type Instance struct {
 	Service     *Service
 	Ip          string
 	InstanceDTO *api.InstanceDTO
+	Initialized bool
+	InitChan    chan struct{}
 }
 
 type PairServiceIdStatus struct {
