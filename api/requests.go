@@ -5,7 +5,6 @@ import (
 )
 
 type ServiceDTO struct {
-	Dependencies []string
 	Ports        nat.PortSet
 }
 
