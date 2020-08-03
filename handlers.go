@@ -143,7 +143,6 @@ func registerServiceHandler(w http.ResponseWriter, r *http.Request) {
 
 	service := &api.Service{
 		Id:           serviceId,
-		Dependencies: serviceDTO.Dependencies,
 		Ports:        serviceDTO.Ports,
 		InstancesMap: &sync.Map{},
 	}
@@ -328,7 +327,6 @@ func getAllServicesHandler(w http.ResponseWriter, _ *http.Request) {
 		serviceId := key.(typeServicesMapKey)
 		service := value.(typeServicesMapValue)
 		services[serviceId] = &api.ServiceDTO{
-			Dependencies: service.Dependencies,
 			Ports:        service.Ports,
 		}
 		return true
