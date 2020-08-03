@@ -59,6 +59,10 @@ func ResolveServiceInArchimedes(hostPort, archimedesHostPort string) (resolvedHo
 		return "", errors.New(fmt.Sprintf("port is not valid for service %s", host))
 	}
 
+	if len(service.InstancesIds) == 0 {
+		panic(fmt.Sprintf("no instance for service %s", host))
+	}
+
 	randInstanceId := service.InstancesIds[rand.Intn(len(service.InstancesIds))]
 	instance := service.InstancesMap[randInstanceId]
 	portResolved := instance.PortTranslation[portWithProto][0]
