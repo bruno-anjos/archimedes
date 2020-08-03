@@ -68,7 +68,7 @@ func ResolveServiceInArchimedes(hostPort, archimedesHostPort string) (resolvedHo
 	portResolved := instance.PortTranslation[portWithProto][0]
 	resolvedHostPort = instance.Ip + ":" + portResolved.HostPort
 
-	log.Debug("resolved %s to %s", hostPort, resolvedHostPort)
+	log.Debugf("resolved %s to %s", hostPort, resolvedHostPort)
 
 	return resolvedHostPort, nil
 }
@@ -112,7 +112,7 @@ func resolveInstanceInArchimedes(httpClient *http.Client, hostPort,
 	portResolved := completedInstance.Instance.PortTranslation[portWithProto][0]
 	resolvedHostPort = completedInstance.Instance.Ip + ":" + portResolved.HostPort
 
-	log.Debug("resolved %s to %s", hostPort, resolvedHostPort)
+	log.Debugf("resolved %s to %s", hostPort, resolvedHostPort)
 
 	return resolvedHostPort, nil
 }
