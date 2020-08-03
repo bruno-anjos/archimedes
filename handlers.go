@@ -20,6 +20,8 @@ type (
 
 	typeHeartbeatsMapKey   = string
 	typeHeartbeatsMapValue = *api.PairServiceIdStatus
+
+	typeInitChansMapValue = chan struct{}
 )
 
 const (
@@ -35,6 +37,7 @@ var (
 	servicesMap   sync.Map
 	instancesMap  sync.Map
 	heartbeatsMap sync.Map
+	initChansMap  sync.Map
 )
 
 func init() {
@@ -45,6 +48,7 @@ func init() {
 	servicesMap = sync.Map{}
 	heartbeatsMap = sync.Map{}
 	instancesMap = sync.Map{}
+	initChansMap = sync.Map{}
 
 	go instanceHeartbeatChecker()
 }
@@ -202,8 +206,9 @@ func registerServiceInstanceHandler(w http.ResponseWriter, r *http.Request) {
 		Ip:              host,
 		PortTranslation: instanceDTO.PortTranslation,
 		Initialized:     instanceDTO.Static,
-		InitChan:        initChan,
 	}
+
+	initChansMap.Store(instanceId, initChan)
 
 	_, loaded := service.InstancesMap.LoadOrStore(instanceId, instance)
 	if loaded {
@@ -270,8 +275,15 @@ func heartbeatServiceInstanceHandler(w http.ResponseWriter, r *http.Request) {
 
 	instance := value.(api.TypeInstancesMapValue)
 	if !instance.Initialized {
+		value, ok := initChansMap.Load(instance.Id)
+		if !ok {
+			log.Warnf("ignoring heartbeat from instance %s since it didnt have an init channel", instanceId)
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
 		instance.Initialized = true
-		close(instance.InitChan)
+		initChan := value.(typeInitChansMapValue)
+		close(initChan)
 	}
 
 	value, ok = heartbeatsMap.Load(instanceId)

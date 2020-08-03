@@ -24,7 +24,6 @@ type Instance struct {
 	Ip              string
 	PortTranslation nat.PortMap
 	Initialized     bool
-	InitChan        chan struct{}
 }
 
 type PairServiceIdStatus struct {
