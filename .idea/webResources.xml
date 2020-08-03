@@ -16,6 +16,13 @@
           </resourceRoots>
         </entryData>
       </entry>
+      <entry url="file://$PROJECT_DIR$/../deployer">
+        <entryData>
+          <resourceRoots>
+            <path value="file://$PROJECT_DIR$/../deployer" />
+          </resourceRoots>
+        </entryData>
+      </entry>
       <entry url="file://$PROJECT_DIR$/../scheduler">
         <entryData>
           <resourceRoots>
