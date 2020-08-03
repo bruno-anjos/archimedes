@@ -25,7 +25,7 @@ func ResolveServiceInArchimedes(hostPort, archimedesHostPort string) (resolvedHo
 	httpClient := &http.Client{
 		Timeout: 10 * time.Second,
 	}
-	archReq := http_utils.BuildRequest(http.MethodPost, archimedesHostPort, GetServicePath(host), nil)
+	archReq := http_utils.BuildRequest(http.MethodGet, archimedesHostPort, GetServicePath(host), nil)
 
 	status, resp := http_utils.DoRequest(httpClient, archReq, nil)
 
@@ -76,7 +76,7 @@ func resolveInstanceInArchimedes(httpClient *http.Client, hostPort,
 		panic(err)
 	}
 
-	archReq := http_utils.BuildRequest(http.MethodPost, archimedesHostPort, GetInstancePath(host), nil)
+	archReq := http_utils.BuildRequest(http.MethodGet, archimedesHostPort, GetInstancePath(host), nil)
 
 	status, resp := http_utils.DoRequest(httpClient, archReq, nil)
 	switch status {
