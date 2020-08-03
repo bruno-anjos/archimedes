@@ -10,5 +10,6 @@ type ServiceDTO struct {
 }
 
 type InstanceDTO struct {
+	Static          bool
 	PortTranslation nat.PortMap `json:"port_translation"`
 }
