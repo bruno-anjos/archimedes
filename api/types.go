@@ -12,7 +12,6 @@ type (
 
 	Service struct {
 		Id           string
-		Dependencies []string
 		Ports        nat.PortSet
 		InstancesMap *sync.Map
 	}
