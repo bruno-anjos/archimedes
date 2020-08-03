@@ -11,9 +11,11 @@ import (
 const (
 	PrefixPath = "/archimedes"
 
-	ServicesPath        = "/services"
-	ServicePath         = "/services/%s"
-	ServiceInstancePath = "/services/%s/%s"
+	ServicesPath             = "/services"
+	ServicePath              = "/services/%s"
+	ServiceInstancePath      = "/services/%s/%s"
+	ServiceInstanceAlivePath = "/services/%s/%s/alive"
+	InstancePath             = "/instances/%s"
 )
 
 const (
@@ -35,6 +37,14 @@ func GetServicePath(serviceId string) string {
 	return PrefixPath + fmt.Sprintf(ServicePath, serviceId)
 }
 
+func GetInstancePath(instanceId string) string {
+	return PrefixPath + fmt.Sprintf(InstancePath, instanceId)
+}
+
 func GetServiceInstancePath(serviceId, instanceId string) string {
 	return PrefixPath + fmt.Sprintf(ServiceInstancePath, serviceId, instanceId)
+}
+
+func GetServiceInstanceAlivePath(serviceId, instanceId string) string {
+	return PrefixPath + fmt.Sprintf(ServiceInstanceAlivePath, serviceId, instanceId)
 }

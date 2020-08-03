@@ -2,8 +2,8 @@ package main
 
 import (
 	"encoding/json"
+	"net"
 	"net/http"
-	"strings"
 	"sync"
 	"time"
 
@@ -16,15 +16,15 @@ import (
 
 type (
 	typeServicesMapKey   = string
-	typeServicesMapValue = *Service
+	typeServicesMapValue = *api.Service
 
 	typeHeartbeatsMapKey   = string
-	typeHeartbeatsMapValue = *PairServiceIdStatus
+	typeHeartbeatsMapValue = *api.PairServiceIdStatus
 )
 
 const (
 	// in seconds
-	httpClientTimeout       = 10
+	httpClientTimeout       = 20
 	heartbeatCheckerTimeout = 10
 	initTimeout             = 20
 )
@@ -33,6 +33,7 @@ var (
 	httpClient *http.Client
 
 	servicesMap   sync.Map
+	instancesMap  sync.Map
 	heartbeatsMap sync.Map
 )
 
@@ -43,6 +44,7 @@ func init() {
 
 	servicesMap = sync.Map{}
 	heartbeatsMap = sync.Map{}
+	instancesMap = sync.Map{}
 
 	go instanceHeartbeatChecker()
 }
@@ -69,6 +71,7 @@ func instanceHeartbeatChecker() {
 					if ok {
 						service := serviceValue.(typeServicesMapValue)
 						service.InstancesMap.Delete(instanceId)
+						instancesMap.Delete(instanceId)
 					} else {
 						log.Debugf("did not find instance %s in service %s, assuming it was already removed",
 							instanceId, pairServiceStatus.ServiceId)
@@ -108,18 +111,16 @@ func cleanUnresponsiveInstance(serviceId, instanceId string, alive <-chan struct
 
 		log.Debugf("instance %s never reported, deleting it from service %s", instanceId, serviceId)
 		service := value.(typeServicesMapValue)
-		service.InstancesMap.Delete(instanceId)
+		removeInstance(service, instanceId)
 
 		log.Debugf("warning scheduler to remove instance %s", instanceId)
 		instancePath := scheduler.GetInstancePath(instanceId)
 		req := http_utils.BuildRequest(http.MethodDelete, scheduler.DefaultHostPort, instancePath, nil)
 		status, _ := http_utils.DoRequest(httpClient, req, nil)
 		if status != http.StatusOK {
-			log.Warnf("while trying to remove instance %s after timeout, scheduler returned code %d",
+			log.Warnf("while trying to remove instance %s after timeout, scheduler returned status %d",
 				instanceId, status)
 		}
-
-		return
 	}
 }
 
@@ -136,9 +137,10 @@ func registerServiceHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	service := &Service{
+	service := &api.Service{
 		Id:           serviceId,
-		ServiceDTO:   &serviceDTO,
+		Dependencies: serviceDTO.Dependencies,
+		Ports:        serviceDTO.Ports,
 		InstancesMap: &sync.Map{},
 	}
 
@@ -188,16 +190,19 @@ func registerServiceInstanceHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ip := strings.Split(r.RemoteAddr, ",")[0]
+	host, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		panic(err)
+	}
 
 	initChan := make(chan struct{})
-	instance := &Instance{
-		Id:          instanceId,
-		Service:     service,
-		Ip:          ip,
-		InstanceDTO: &instanceDTO,
-		Initialized: false,
-		InitChan:    initChan,
+	instance := &api.Instance{
+		Id:              instanceId,
+		Service:         service,
+		Ip:              host,
+		PortTranslation: instanceDTO.PortTranslation,
+		Initialized:     instanceDTO.Static,
+		InitChan:        initChan,
 	}
 
 	_, loaded := service.InstancesMap.LoadOrStore(instanceId, instance)
@@ -206,9 +211,15 @@ func registerServiceInstanceHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	go cleanUnresponsiveInstance(serviceId, instanceId, initChan)
+	instancesMap.Store(instanceId, instance)
 
-	log.Debugf("added instance %s to instances waiting for heartbeat", instanceId)
+	if !instanceDTO.Static {
+		go cleanUnresponsiveInstance(serviceId, instanceId, initChan)
+		log.Debugf("added INTERACTIVE instance %s to instances waiting for heartbeat", instanceId)
+	} else {
+		log.Debugf("added STATIC instance %s", instanceId)
+	}
+
 }
 
 func deleteServiceInstanceHandler(w http.ResponseWriter, r *http.Request) {
@@ -221,17 +232,16 @@ func deleteServiceInstanceHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	instancesFromService := value.(typeServicesMapValue)
+	service := value.(typeServicesMapValue)
 
 	instanceId := http_utils.ExtractPathVar(r, instanceIdPathVar)
-	_, ok = instancesFromService.InstancesMap.Load(instanceId)
+	_, ok = service.InstancesMap.Load(instanceId)
 	if !ok {
 		w.WriteHeader(http.StatusNotFound)
 		return
 	}
 
-	instancesFromService.InstancesMap.Delete(instanceId)
-	heartbeatsMap.Delete(instanceId)
+	removeInstance(service, instanceId)
 
 	log.Debugf("deleted instance %s from service %s", instanceId, serviceId)
 }
@@ -258,26 +268,43 @@ func heartbeatServiceInstanceHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	instance := value.(typeInstancesMapValue)
+	instance := value.(api.TypeInstancesMapValue)
 	if !instance.Initialized {
 		instance.Initialized = true
 		close(instance.InitChan)
 	}
 
-	pairServiceStatus := &PairServiceIdStatus{
+	value, ok = heartbeatsMap.Load(instanceId)
+	if !ok {
+		w.WriteHeader(http.StatusNotFound)
+		return
+	}
+
+	pairServiceStatus := value.(typeHeartbeatsMapValue)
+	pairServiceStatus.Mutex.Lock()
+	pairServiceStatus.IsUp = true
+	pairServiceStatus.Mutex.Unlock()
+
+	log.Debugf("got heartbeat from instance %s", instanceId)
+}
+
+func registerHeartbeatServiceInstanceHandler(w http.ResponseWriter, r *http.Request) {
+	serviceId := http_utils.ExtractPathVar(r, serviceIdPathVar)
+	instanceId := http_utils.ExtractPathVar(r, instanceIdPathVar)
+
+	pairServiceStatus := &api.PairServiceIdStatus{
 		ServiceId: serviceId,
 		IsUp:      true,
 		Mutex:     &sync.Mutex{},
 	}
-	value, loaded := heartbeatsMap.LoadOrStore(instanceId, pairServiceStatus)
+
+	_, loaded := heartbeatsMap.LoadOrStore(instanceId, pairServiceStatus)
 	if loaded {
-		pairServiceStatus = value.(typeHeartbeatsMapValue)
-		pairServiceStatus.Mutex.Lock()
-		pairServiceStatus.IsUp = true
-		pairServiceStatus.Mutex.Unlock()
+		w.WriteHeader(http.StatusConflict)
+		return
 	}
 
-	log.Debugf("got heartbeat from instance %s", instanceId)
+	log.Debugf("registered service %s instance %s first heartbeat", serviceId, instanceId)
 }
 
 func getAllServicesHandler(w http.ResponseWriter, _ *http.Request) {
@@ -288,7 +315,10 @@ func getAllServicesHandler(w http.ResponseWriter, _ *http.Request) {
 	servicesMap.Range(func(key, value interface{}) bool {
 		serviceId := key.(typeServicesMapKey)
 		service := value.(typeServicesMapValue)
-		services[serviceId] = service.ServiceDTO
+		services[serviceId] = &api.ServiceDTO{
+			Dependencies: service.Dependencies,
+			Ports:        service.Ports,
+		}
 		return true
 	})
 
@@ -307,16 +337,25 @@ func getAllServiceInstancesHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	service := value.(typeServicesMapValue)
-	instances := map[string]*api.InstanceDTO{}
+	instances := map[api.TypeInstancesMapKey]api.TypeInstancesMapValue{}
+	var instanceIds []api.TypeInstancesMapKey
 
 	service.InstancesMap.Range(func(key, value interface{}) bool {
-		instanceId := key.(typeInstancesMapKey)
-		instance := value.(typeInstancesMapValue)
-		instances[instanceId] = instance.InstanceDTO
+		instanceId := key.(api.TypeInstancesMapKey)
+		instance := value.(api.TypeInstancesMapValue)
+
+		instances[instanceId] = instance
+		instanceIds = append(instanceIds, instanceId)
 		return true
 	})
 
-	http_utils.SendJSONReplyOK(w, instances)
+	response := api.CompletedServiceDTO{
+		Ports:        service.Ports,
+		InstancesIds: instanceIds,
+		InstancesMap: instances,
+	}
+
+	http_utils.SendJSONReplyOK(w, response)
 }
 
 func getServiceInstanceHandler(w http.ResponseWriter, r *http.Request) {
@@ -339,7 +378,25 @@ func getServiceInstanceHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	http_utils.SendJSONReplyOK(w, value.(typeInstancesMapValue))
+	http_utils.SendJSONReplyOK(w, value.(api.TypeInstancesMapValue))
+}
+
+func getInstanceHandler(w http.ResponseWriter, r *http.Request) {
+	instanceId := http_utils.ExtractPathVar(r, instanceIdPathVar)
+
+	value, ok := instancesMap.Load(instanceId)
+	if !ok {
+		w.WriteHeader(http.StatusNotFound)
+		return
+	}
+
+	instance := value.(api.TypeInstancesMapValue)
+	resp := api.CompletedInstanceDTO{
+		Ports:    instance.Service.Ports,
+		Instance: instance,
+	}
+
+	http_utils.SendJSONReplyOK(w, resp)
 }
 
 var (
@@ -361,4 +418,10 @@ func changeInstanceStateHandler(w http.ResponseWriter, r *http.Request) {
 
 	// TODO
 	panic("implement me")
+}
+
+func removeInstance(service *api.Service, instanceId string) {
+	service.InstancesMap.Delete(instanceId)
+	instancesMap.Delete(instanceId)
+	heartbeatsMap.Delete(instanceId)
 }

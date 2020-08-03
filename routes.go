@@ -10,15 +10,17 @@ import (
 
 // Route names
 const (
-	registerServiceName          = "REGISTER_SERVICE"
-	deleteServiceName            = "DELETE_SERVICE"
-	registerServiceInstanceName  = "REGISTER_SERVICE"
-	deleteServiceInstanceName    = "DELETE_SERVICE_INSTANCE"
-	heartbeatServiceInstanceName = "HEARTBEAT_SERVICE_INSTANCE"
-	getAllServicesName           = "GET_ALL_SERVICES"
-	getAllServiceInstancesName   = "GET_ALL_SERVICE_INSTANCES"
-	getServiceInstanceName       = "GET_SERVICE_INSTANCE"
-	changeInstanceStateName      = "CHANGE_INSTANCE_STATE"
+	registerServiceName                  = "REGISTER_SERVICE"
+	deleteServiceName                    = "DELETE_SERVICE"
+	registerServiceInstanceName          = "REGISTER_SERVICE"
+	registerHeartbeatServiceInstanceName = "REGISTER_HEARTBEAT"
+	deleteServiceInstanceName            = "DELETE_SERVICE_INSTANCE"
+	heartbeatServiceInstanceName         = "HEARTBEAT_SERVICE_INSTANCE"
+	getAllServicesName                   = "GET_ALL_SERVICES"
+	getAllServiceInstancesName           = "GET_ALL_SERVICE_INSTANCES"
+	getServiceInstanceName               = "GET_SERVICE_INSTANCE"
+	getInstanceName                      = "GET_INSTANCE"
+	changeInstanceStateName              = "CHANGE_INSTANCE_STATE"
 )
 
 // Path variables
@@ -33,7 +35,11 @@ var (
 
 	servicesRoute        = api.ServicesPath
 	serviceRoute         = fmt.Sprintf(api.ServicePath, _serviceIdPathVarFormatted)
-	serviceInstanceRoute = fmt.Sprintf(api.ServiceInstancePath, _serviceIdPathVarFormatted, _instanceIdPathVarFormatted)
+	serviceInstanceRoute = fmt.Sprintf(api.ServiceInstancePath, _serviceIdPathVarFormatted,
+		_instanceIdPathVarFormatted)
+	serviceInstanceAliveRoute = fmt.Sprintf(api.ServiceInstanceAlivePath, _serviceIdPathVarFormatted,
+		_instanceIdPathVarFormatted)
+	instanceRoute = fmt.Sprintf(api.InstancePath, _instanceIdPathVarFormatted)
 )
 
 var routes = []http_utils.Route{
@@ -81,6 +87,13 @@ var routes = []http_utils.Route{
 	},
 
 	{
+		Name:        registerHeartbeatServiceInstanceName,
+		Method:      http.MethodPost,
+		Pattern:     serviceInstanceAliveRoute,
+		HandlerFunc: registerHeartbeatServiceInstanceHandler,
+	},
+
+	{
 		Name:        getAllServicesName,
 		Method:      http.MethodGet,
 		Pattern:     servicesRoute,
@@ -92,6 +105,13 @@ var routes = []http_utils.Route{
 		Method:      http.MethodGet,
 		Pattern:     serviceRoute,
 		HandlerFunc: getAllServiceInstancesHandler,
+	},
+
+	{
+		Name:        getInstanceName,
+		Method:      http.MethodGet,
+		Pattern:     instanceRoute,
+		HandlerFunc: getInstanceHandler,
 	},
 
 	{

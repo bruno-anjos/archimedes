@@ -1,7 +1,12 @@
 github.com/Microsoft/go-winio v0.4.14/go.mod h1:qXqCSQ3Xa7+6tgxaGTIe4Kpcdsi+P8jBhyzoq1bpyYA=
 github.com/bruno-anjos/archimedes v0.0.0-20200730160527-37e36e2f1583/go.mod h1:LkuMgcrQqu/qnDpZoz9ZLwQB2zeMUli7O6JAwZkWbVc=
+github.com/bruno-anjos/archimedes v0.0.0-20200731153328-0fb213b05ee7/go.mod h1:ragxs+8yKbXkRwM0fl5h07uq+Kcy+pdqVVF0NGJwjZU=
+github.com/bruno-anjos/archimedesHTTPClient v0.0.0-20200731165616-9aa4edba78b5 h1:uFMCtc9SnPxvAVvbul7LqMU66WQrRM0yaEgN21mBquc=
+github.com/bruno-anjos/archimedesHTTPClient v0.0.0-20200731165616-9aa4edba78b5/go.mod h1:yXzI3IH6yNelEGD7qD21aYxj32498A9ffcFI62f++vA=
 github.com/bruno-anjos/scheduler v0.0.0-20200730160240-da949fb91af9 h1:pdy+JMW4U6XjnoRDPrkqQCgNsK0gE7Es8CGF5v+dOY0=
 github.com/bruno-anjos/solution-utils v0.0.0-20200711142738-3257ca8b5e39/go.mod h1:S6fgSBlp7Qfd/nQGCR8y+xpnpkB2qz8iiQ9ggsQZPQs=
+github.com/bruno-anjos/solution-utils v0.0.0-20200730160126-4bddd1152617/go.mod h1:S6fgSBlp7Qfd/nQGCR8y+xpnpkB2qz8iiQ9ggsQZPQs=
+github.com/bruno-anjos/solution-utils v0.0.0-20200731153528-f4f5b5285b7d/go.mod h1:S6fgSBlp7Qfd/nQGCR8y+xpnpkB2qz8iiQ9ggsQZPQs=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/docker/distribution v2.7.1+incompatible h1:a5mlkVzth6W5A4fOsS3D2EO5BUmsJpcB+cRlLU7cSug=

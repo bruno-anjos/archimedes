@@ -9,6 +9,13 @@
           </resourceRoots>
         </entryData>
       </entry>
+      <entry url="file://$PROJECT_DIR$/../archimedesHTTPClient">
+        <entryData>
+          <resourceRoots>
+            <path value="file://$PROJECT_DIR$/../archimedesHTTPClient" />
+          </resourceRoots>
+        </entryData>
+      </entry>
       <entry url="file://$PROJECT_DIR$/../scheduler">
         <entryData>
           <resourceRoots>
