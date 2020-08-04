@@ -16,6 +16,10 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+const (
+	HeartbeatCheckerTimeout = 10
+)
+
 func ResolveServiceInArchimedes(hostPort, archimedesHostPort string) (resolvedHostPort string, err error) {
 	host, port, err := net.SplitHostPort(hostPort)
 	if err != nil {
@@ -138,9 +142,11 @@ func SendHeartbeatInstanceToArchimedes(archimedesHostPort string) {
 		panic(errors.New(fmt.Sprintf("received unexpected status %d", status)))
 	}
 
+	ticker := time.NewTicker((HeartbeatCheckerTimeout / 2) * time.Second)
 	serviceInstancePath := GetServiceInstancePath(serviceId, instanceId)
+	req = http_utils.BuildRequest(http.MethodPut, archimedesHostPort, serviceInstancePath, nil)
 	for {
-		req = http_utils.BuildRequest(http.MethodPut, archimedesHostPort, serviceInstancePath, nil)
+		<-ticker.C
 		status, _ = http_utils.DoRequest(httpClient, req, nil)
 
 		switch status {
