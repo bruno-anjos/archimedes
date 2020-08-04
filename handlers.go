@@ -26,9 +26,8 @@ type (
 
 const (
 	// in seconds
-	httpClientTimeout       = 20
-	heartbeatCheckerTimeout = 10
-	initTimeout             = 20
+	httpClientTimeout = 20
+	initTimeout       = 20
 )
 
 var (
@@ -54,48 +53,47 @@ func init() {
 }
 
 func instanceHeartbeatChecker() {
-	ticker := time.NewTicker(heartbeatCheckerTimeout * time.Second)
+	timer := time.NewTimer(api.HeartbeatCheckerTimeout * time.Second)
 
 	var toDelete []string
 	for {
 		toDelete = []string{}
-		select {
-		case <-ticker.C:
-			log.Debug("checking heartbeats")
-			heartbeatsMap.Range(func(key, value interface{}) bool {
-				instanceId := key.(typeHeartbeatsMapKey)
-				pairServiceStatus := value.(typeHeartbeatsMapValue)
-				pairServiceStatus.Mutex.Lock()
+		<-timer.C
+		log.Debug("checking heartbeats")
+		heartbeatsMap.Range(func(key, value interface{}) bool {
+			instanceId := key.(typeHeartbeatsMapKey)
+			pairServiceStatus := value.(typeHeartbeatsMapValue)
+			pairServiceStatus.Mutex.Lock()
 
-				// case where instance didnt set online status since last status reset, so it has to be removed
-				if !pairServiceStatus.IsUp {
-					pairServiceStatus.Mutex.Unlock()
-					serviceValue, ok := servicesMap.Load(pairServiceStatus.ServiceId)
-					// case where the instance will be removed and there is a service for that instance
-					if ok {
-						service := serviceValue.(typeServicesMapValue)
-						service.InstancesMap.Delete(instanceId)
-						instancesMap.Delete(instanceId)
-					} else {
-						log.Debugf("did not find instance %s in service %s, assuming it was already removed",
-							instanceId, pairServiceStatus.ServiceId)
-					}
-
-					toDelete = append(toDelete, instanceId)
-					log.Debugf("removing instance %s", instanceId)
+			// case where instance didnt set online status since last status reset, so it has to be removed
+			if !pairServiceStatus.IsUp {
+				pairServiceStatus.Mutex.Unlock()
+				serviceValue, ok := servicesMap.Load(pairServiceStatus.ServiceId)
+				// case where the instance will be removed and there is a service for that instance
+				if ok {
+					service := serviceValue.(typeServicesMapValue)
+					service.InstancesMap.Delete(instanceId)
+					instancesMap.Delete(instanceId)
 				} else {
-					pairServiceStatus.IsUp = false
-					pairServiceStatus.Mutex.Unlock()
+					log.Debugf("did not find instance %s in service %s, assuming it was already removed",
+						instanceId, pairServiceStatus.ServiceId)
 				}
 
-				return true
-			})
-		}
+				toDelete = append(toDelete, instanceId)
+				log.Debugf("removing instance %s", instanceId)
+			} else {
+				pairServiceStatus.IsUp = false
+				pairServiceStatus.Mutex.Unlock()
+			}
+
+			return true
+		})
 
 		for _, instanceId := range toDelete {
 			log.Debugf("removing %s instance from expected hearbeats map", instanceId)
 			heartbeatsMap.Delete(instanceId)
 		}
+		timer.Reset(api.HeartbeatCheckerTimeout * time.Second)
 	}
 }
 
@@ -327,7 +325,7 @@ func getAllServicesHandler(w http.ResponseWriter, _ *http.Request) {
 		serviceId := key.(typeServicesMapKey)
 		service := value.(typeServicesMapValue)
 		services[serviceId] = &api.ServiceDTO{
-			Ports:        service.Ports,
+			Ports: service.Ports,
 		}
 		return true
 	})
