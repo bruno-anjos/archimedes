@@ -131,7 +131,7 @@ func cleanUnresponsiveInstance(serviceId, instanceId string, alive <-chan struct
 func registerServiceHandler(w http.ResponseWriter, r *http.Request) {
 	log.Debug("handling request in registerService handler")
 
-	serviceId := http_utils.ExtractPathVar(r, serviceIdPathVar)
+	serviceId := http_utils.ExtractPathVar(r, ServiceIdPathVar)
 
 	serviceDTO := api.ServiceDTO{}
 	err := json.NewDecoder(r.Body).Decode(&serviceDTO)
@@ -159,7 +159,7 @@ func registerServiceHandler(w http.ResponseWriter, r *http.Request) {
 func deleteServiceHandler(w http.ResponseWriter, r *http.Request) {
 	log.Debug("handling request in deleteService handler")
 
-	serviceId := http_utils.ExtractPathVar(r, serviceIdPathVar)
+	serviceId := http_utils.ExtractPathVar(r, ServiceIdPathVar)
 	_, ok := servicesMap.Load(serviceId)
 	if !ok {
 		w.WriteHeader(http.StatusNotFound)
@@ -174,7 +174,7 @@ func deleteServiceHandler(w http.ResponseWriter, r *http.Request) {
 func registerServiceInstanceHandler(w http.ResponseWriter, r *http.Request) {
 	log.Debug("handling request in registerServiceInstance handler")
 
-	serviceId := http_utils.ExtractPathVar(r, serviceIdPathVar)
+	serviceId := http_utils.ExtractPathVar(r, ServiceIdPathVar)
 
 	value, ok := servicesMap.Load(serviceId)
 	if !ok {
@@ -184,7 +184,7 @@ func registerServiceInstanceHandler(w http.ResponseWriter, r *http.Request) {
 
 	service := value.(typeServicesMapValue)
 
-	instanceId := http_utils.ExtractPathVar(r, instanceIdPathVar)
+	instanceId := http_utils.ExtractPathVar(r, InstanceIdPathVar)
 
 	instanceDTO := api.InstanceDTO{}
 	err := json.NewDecoder(r.Body).Decode(&instanceDTO)
@@ -229,7 +229,7 @@ func registerServiceInstanceHandler(w http.ResponseWriter, r *http.Request) {
 func deleteServiceInstanceHandler(w http.ResponseWriter, r *http.Request) {
 	log.Debug("handling request in deleteServiceInstance handler")
 
-	serviceId := http_utils.ExtractPathVar(r, serviceIdPathVar)
+	serviceId := http_utils.ExtractPathVar(r, ServiceIdPathVar)
 	value, ok := servicesMap.Load(serviceId)
 	if !ok {
 		w.WriteHeader(http.StatusNotFound)
@@ -238,7 +238,7 @@ func deleteServiceInstanceHandler(w http.ResponseWriter, r *http.Request) {
 
 	service := value.(typeServicesMapValue)
 
-	instanceId := http_utils.ExtractPathVar(r, instanceIdPathVar)
+	instanceId := http_utils.ExtractPathVar(r, InstanceIdPathVar)
 	_, ok = service.InstancesMap.Load(instanceId)
 	if !ok {
 		w.WriteHeader(http.StatusNotFound)
@@ -253,7 +253,7 @@ func deleteServiceInstanceHandler(w http.ResponseWriter, r *http.Request) {
 func heartbeatServiceInstanceHandler(w http.ResponseWriter, r *http.Request) {
 	log.Debug("handling request in heartbeatService handler")
 
-	serviceId := http_utils.ExtractPathVar(r, serviceIdPathVar)
+	serviceId := http_utils.ExtractPathVar(r, ServiceIdPathVar)
 
 	value, ok := servicesMap.Load(serviceId)
 	if !ok {
@@ -263,7 +263,7 @@ func heartbeatServiceInstanceHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	service := value.(typeServicesMapValue)
-	instanceId := http_utils.ExtractPathVar(r, instanceIdPathVar)
+	instanceId := http_utils.ExtractPathVar(r, InstanceIdPathVar)
 
 	value, ok = service.InstancesMap.Load(instanceId)
 	if !ok {
@@ -300,8 +300,8 @@ func heartbeatServiceInstanceHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func registerHeartbeatServiceInstanceHandler(w http.ResponseWriter, r *http.Request) {
-	serviceId := http_utils.ExtractPathVar(r, serviceIdPathVar)
-	instanceId := http_utils.ExtractPathVar(r, instanceIdPathVar)
+	serviceId := http_utils.ExtractPathVar(r, ServiceIdPathVar)
+	instanceId := http_utils.ExtractPathVar(r, InstanceIdPathVar)
 
 	pairServiceStatus := &api.PairServiceIdStatus{
 		ServiceId: serviceId,
@@ -338,7 +338,7 @@ func getAllServicesHandler(w http.ResponseWriter, _ *http.Request) {
 func getAllServiceInstancesHandler(w http.ResponseWriter, r *http.Request) {
 	log.Debug("handling request in getAllServiceInstances handler")
 
-	serviceId := http_utils.ExtractPathVar(r, serviceIdPathVar)
+	serviceId := http_utils.ExtractPathVar(r, ServiceIdPathVar)
 
 	value, ok := servicesMap.Load(serviceId)
 	if !ok {
@@ -371,7 +371,7 @@ func getAllServiceInstancesHandler(w http.ResponseWriter, r *http.Request) {
 func getServiceInstanceHandler(w http.ResponseWriter, r *http.Request) {
 	log.Debug("handling request in getServiceInstance handler")
 
-	serviceId := http_utils.ExtractPathVar(r, serviceIdPathVar)
+	serviceId := http_utils.ExtractPathVar(r, ServiceIdPathVar)
 
 	value, ok := servicesMap.Load(serviceId)
 	if !ok {
@@ -380,7 +380,7 @@ func getServiceInstanceHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	service := value.(typeServicesMapValue)
-	instanceId := http_utils.ExtractPathVar(r, instanceIdPathVar)
+	instanceId := http_utils.ExtractPathVar(r, InstanceIdPathVar)
 
 	value, ok = service.InstancesMap.Load(instanceId)
 	if !ok {
@@ -392,7 +392,7 @@ func getServiceInstanceHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func getInstanceHandler(w http.ResponseWriter, r *http.Request) {
-	instanceId := http_utils.ExtractPathVar(r, instanceIdPathVar)
+	instanceId := http_utils.ExtractPathVar(r, InstanceIdPathVar)
 
 	value, ok := instancesMap.Load(instanceId)
 	if !ok {

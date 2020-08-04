@@ -25,13 +25,13 @@ const (
 
 // Path variables
 const (
-	serviceIdPathVar  = "serviceId"
-	instanceIdPathVar = "instanceId"
+	ServiceIdPathVar  = "serviceId"
+	InstanceIdPathVar = "instanceId"
 )
 
 var (
-	_serviceIdPathVarFormatted  = fmt.Sprintf(http_utils.PathVarFormat, serviceIdPathVar)
-	_instanceIdPathVarFormatted = fmt.Sprintf(http_utils.PathVarFormat, instanceIdPathVar)
+	_serviceIdPathVarFormatted  = fmt.Sprintf(http_utils.PathVarFormat, ServiceIdPathVar)
+	_instanceIdPathVarFormatted = fmt.Sprintf(http_utils.PathVarFormat, InstanceIdPathVar)
 
 	servicesRoute        = api.ServicesPath
 	serviceRoute         = fmt.Sprintf(api.ServicePath, _serviceIdPathVarFormatted)
