@@ -3,8 +3,6 @@ package api
 import (
 	"fmt"
 	"strconv"
-
-	utils "github.com/bruno-anjos/solution-utils"
 )
 
 // Paths
@@ -26,11 +24,12 @@ const (
 )
 
 const (
+	ArchimedesServiceName = "archimedes"
 	Port = 50000
 )
 
 var (
-	DefaultHostPort = utils.LocalhostAddr + ":" + strconv.Itoa(Port)
+	DefaultHostPort = ArchimedesServiceName + ":" + strconv.Itoa(Port)
 )
 
 func GetServicePath(serviceId string) string {
