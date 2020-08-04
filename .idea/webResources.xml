@@ -23,6 +23,13 @@
           </resourceRoots>
         </entryData>
       </entry>
+      <entry url="file://$PROJECT_DIR$/../deployer-cli-client">
+        <entryData>
+          <resourceRoots>
+            <path value="file://$PROJECT_DIR$/../deployer-cli-client" />
+          </resourceRoots>
+        </entryData>
+      </entry>
       <entry url="file://$PROJECT_DIR$/../scheduler">
         <entryData>
           <resourceRoots>

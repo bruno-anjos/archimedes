@@ -5,6 +5,7 @@
     <content url="file://$MODULE_DIR$" />
     <content url="file://$MODULE_DIR$/../archimedesHTTPClient" />
     <content url="file://$MODULE_DIR$/../deployer" />
+    <content url="file://$MODULE_DIR$/../deployer-cli-client" />
     <content url="file://$MODULE_DIR$/../scheduler" />
     <content url="file://$MODULE_DIR$/../solution-utils" />
     <content url="file://$USER_HOME$/test_authentication_image" />
