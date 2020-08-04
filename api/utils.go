@@ -10,7 +10,7 @@ import (
 	"os"
 	"time"
 
-	generic_utils "github.com/bruno-anjos/solution-utils"
+	genericutils "github.com/bruno-anjos/solution-utils"
 	"github.com/bruno-anjos/solution-utils/http_utils"
 	"github.com/docker/go-connections/nat"
 	log "github.com/sirupsen/logrus"
@@ -20,7 +20,7 @@ const (
 	HeartbeatCheckerTimeout = 10
 )
 
-func ResolveServiceInArchimedes(hostPort, archimedesHostPort string) (resolvedHostPort string, err error) {
+func ResolveServiceInArchimedes(hostPort string) (resolvedHostPort string, err error) {
 	host, port, err := net.SplitHostPort(hostPort)
 	if err != nil {
 		panic(err)
@@ -29,14 +29,14 @@ func ResolveServiceInArchimedes(hostPort, archimedesHostPort string) (resolvedHo
 	httpClient := &http.Client{
 		Timeout: 10 * time.Second,
 	}
-	archReq := http_utils.BuildRequest(http.MethodGet, archimedesHostPort, GetServicePath(host), nil)
+	archReq := http_utils.BuildRequest(http.MethodGet, DefaultHostPort, GetServicePath(host), nil)
 
 	status, resp := http_utils.DoRequest(httpClient, archReq, nil)
 
 	switch status {
 	case http.StatusNotFound:
 		log.Debugf("could not resolve service %s", hostPort)
-		resolvedHostPort, err = resolveInstanceInArchimedes(httpClient, hostPort, archimedesHostPort)
+		resolvedHostPort, err = resolveInstanceInArchimedes(httpClient, hostPort)
 		if err != nil {
 			return "", err
 		}
@@ -53,7 +53,7 @@ func ResolveServiceInArchimedes(hostPort, archimedesHostPort string) (resolvedHo
 		panic(err)
 	}
 
-	portWithProto, err := nat.NewPort(generic_utils.TCP, port)
+	portWithProto, err := nat.NewPort(genericutils.TCP, port)
 	if err != nil {
 		panic(err)
 	}
@@ -77,14 +77,13 @@ func ResolveServiceInArchimedes(hostPort, archimedesHostPort string) (resolvedHo
 	return resolvedHostPort, nil
 }
 
-func resolveInstanceInArchimedes(httpClient *http.Client, hostPort,
-	archimedesHostPort string) (resolvedHostPort string, err error) {
+func resolveInstanceInArchimedes(httpClient *http.Client, hostPort string) (resolvedHostPort string, err error) {
 	host, port, err := net.SplitHostPort(hostPort)
 	if err != nil {
 		panic(err)
 	}
 
-	archReq := http_utils.BuildRequest(http.MethodGet, archimedesHostPort, GetInstancePath(host), nil)
+	archReq := http_utils.BuildRequest(http.MethodGet, DefaultHostPort, GetInstancePath(host), nil)
 
 	status, resp := http_utils.DoRequest(httpClient, archReq, nil)
 	switch status {
@@ -103,7 +102,7 @@ func resolveInstanceInArchimedes(httpClient *http.Client, hostPort,
 		panic(err)
 	}
 
-	portWithProto, err := nat.NewPort(generic_utils.TCP, port)
+	portWithProto, err := nat.NewPort(genericutils.TCP, port)
 	if err != nil {
 		panic(err)
 	}
@@ -122,8 +121,8 @@ func resolveInstanceInArchimedes(httpClient *http.Client, hostPort,
 }
 
 func SendHeartbeatInstanceToArchimedes(archimedesHostPort string) {
-	serviceId := os.Getenv(generic_utils.ServiceEnvVarName)
-	instanceId := os.Getenv(generic_utils.InstanceEnvVarName)
+	serviceId := os.Getenv(genericutils.ServiceEnvVarName)
+	instanceId := os.Getenv(genericutils.InstanceEnvVarName)
 
 	httpClient := &http.Client{
 		Timeout: 10 * time.Second,
