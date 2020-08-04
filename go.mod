@@ -3,7 +3,7 @@ module github.com/bruno-anjos/archimedes
 go 1.13
 
 require (
-	github.com/bruno-anjos/scheduler v0.0.0-20200804140215-71b908c75919
+	github.com/bruno-anjos/scheduler v0.0.0-20200804151330-da4916073155
 	github.com/bruno-anjos/solution-utils v0.0.0-20200804140242-989a419bda22
 	github.com/docker/go-connections v0.4.0
 	github.com/gorilla/mux v1.7.4
@@ -11,6 +11,6 @@ require (
 )
 
 replace (
-	github.com/bruno-anjos/scheduler v0.0.0-20200804140215-71b908c75919 => ./../scheduler
+	github.com/bruno-anjos/scheduler v0.0.0-20200804151330-da4916073155 => ./../scheduler
 	github.com/bruno-anjos/solution-utils v0.0.0-20200804140242-989a419bda22 => ./../solution-utils
 )
