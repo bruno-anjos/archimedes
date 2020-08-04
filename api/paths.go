@@ -30,7 +30,7 @@ const (
 )
 
 var (
-	DefaultHostPort = utils.DefaultInterface + ":" + strconv.Itoa(Port)
+	DefaultHostPort = utils.LocalhostAddr + ":" + strconv.Itoa(Port)
 )
 
 func GetServicePath(serviceId string) string {
