@@ -9,6 +9,7 @@ import (
 
 	"github.com/bruno-anjos/archimedes/api"
 	scheduler "github.com/bruno-anjos/scheduler/api"
+	generic_utils "github.com/bruno-anjos/solution-utils"
 	"github.com/bruno-anjos/solution-utils/http_utils"
 	"github.com/gorilla/mux"
 	log "github.com/sirupsen/logrus"
@@ -191,9 +192,14 @@ func registerServiceInstanceHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	host, _, err := net.SplitHostPort(r.RemoteAddr)
-	if err != nil {
-		panic(err)
+	var host string
+	if instanceDTO.Local {
+		host = generic_utils.LocalhostAddr
+	} else {
+		host, _, err = net.SplitHostPort(r.RemoteAddr)
+		if err != nil {
+			panic(err)
+		}
 	}
 
 	initChan := make(chan struct{})
