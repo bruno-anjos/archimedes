@@ -128,6 +128,8 @@ func SendHeartbeatInstanceToArchimedes(archimedesHostPort string) {
 		Timeout: 10 * time.Second,
 	}
 
+	log.Debugf("will start sending heartbeats to %s as %s from %s", archimedesHostPort, instanceId, serviceId)
+
 	serviceInstanceAlivePath := GetServiceInstanceAlivePath(serviceId, instanceId)
 	req := http_utils.BuildRequest(http.MethodPost, archimedesHostPort, serviceInstanceAlivePath, nil)
 	status, _ := http_utils.DoRequest(httpClient, req, nil)
