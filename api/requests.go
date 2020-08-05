@@ -5,10 +5,11 @@ import (
 )
 
 type ServiceDTO struct {
-	Ports        nat.PortSet
+	Ports nat.PortSet
 }
 
 type InstanceDTO struct {
 	Static          bool
 	PortTranslation nat.PortMap `json:"port_translation"`
+	Local           bool
 }
