@@ -17,12 +17,13 @@ import (
 )
 
 const (
-	HeartbeatCheckerTimeout = 10
+	HeartbeatCheckerTimeout = 60
 )
 
 func ResolveServiceInArchimedes(hostPort string) (resolvedHostPort string, err error) {
 	host, port, err := net.SplitHostPort(hostPort)
 	if err != nil {
+		log.Error("hostport: ", hostPort)
 		panic(err)
 	}
 
@@ -69,8 +70,15 @@ func ResolveServiceInArchimedes(hostPort string) (resolvedHostPort string, err e
 
 	randInstanceId := service.InstancesIds[rand.Intn(len(service.InstancesIds))]
 	instance := service.InstancesMap[randInstanceId]
-	portResolved := instance.PortTranslation[portWithProto][0]
-	resolvedHostPort = instance.Ip + ":" + portResolved.HostPort
+
+	var portResolved string
+	if instance.Local {
+		portResolved = portWithProto.Port()
+	} else {
+		portResolved = instance.PortTranslation[portWithProto][0].HostPort
+	}
+
+	resolvedHostPort = instance.Ip + ":" + portResolved
 
 	log.Debugf("resolved %s to %s", hostPort, resolvedHostPort)
 
@@ -112,8 +120,14 @@ func resolveInstanceInArchimedes(httpClient *http.Client, hostPort string) (reso
 		return "", errors.New(fmt.Sprintf("port is not valid for service %s", host))
 	}
 
-	portResolved := completedInstance.Instance.PortTranslation[portWithProto][0]
-	resolvedHostPort = completedInstance.Instance.Ip + ":" + portResolved.HostPort
+	var portResolved string
+	if completedInstance.Instance.Local {
+		portResolved = portWithProto.Port()
+	} else {
+		portResolved = completedInstance.Instance.PortTranslation[portWithProto][0].HostPort
+	}
+
+	resolvedHostPort = completedInstance.Instance.Ip + ":" + portResolved
 
 	log.Debugf("resolved %s to %s", hostPort, resolvedHostPort)
 
@@ -128,7 +142,7 @@ func SendHeartbeatInstanceToArchimedes(archimedesHostPort string) {
 		Timeout: 10 * time.Second,
 	}
 
-	log.Debugf("will start sending heartbeats to %s as %s from %s", archimedesHostPort, instanceId, serviceId)
+	log.Infof("will start sending heartbeats to %s as %s from %s", archimedesHostPort, instanceId, serviceId)
 
 	serviceInstanceAlivePath := GetServiceInstanceAlivePath(serviceId, instanceId)
 	req := http_utils.BuildRequest(http.MethodPost, archimedesHostPort, serviceInstanceAlivePath, nil)
@@ -143,11 +157,12 @@ func SendHeartbeatInstanceToArchimedes(archimedesHostPort string) {
 		panic(errors.New(fmt.Sprintf("received unexpected status %d", status)))
 	}
 
-	ticker := time.NewTicker((HeartbeatCheckerTimeout / 2) * time.Second)
+	ticker := time.NewTicker((HeartbeatCheckerTimeout / 3) * time.Second)
 	serviceInstancePath := GetServiceInstancePath(serviceId, instanceId)
 	req = http_utils.BuildRequest(http.MethodPut, archimedesHostPort, serviceInstancePath, nil)
 	for {
 		<-ticker.C
+		log.Info("sending heartbeat to archimedes")
 		status, _ = http_utils.DoRequest(httpClient, req, nil)
 
 		switch status {
