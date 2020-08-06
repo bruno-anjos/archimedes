@@ -23,6 +23,7 @@ type Instance struct {
 	Ip              string
 	PortTranslation nat.PortMap
 	Initialized     bool
+	Local           bool
 }
 
 type PairServiceIdStatus struct {
