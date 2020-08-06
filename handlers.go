@@ -9,7 +9,6 @@ import (
 
 	"github.com/bruno-anjos/archimedes/api"
 	scheduler "github.com/bruno-anjos/scheduler/api"
-	generic_utils "github.com/bruno-anjos/solution-utils"
 	"github.com/bruno-anjos/solution-utils/http_utils"
 	"github.com/gorilla/mux"
 	log "github.com/sirupsen/logrus"
@@ -28,7 +27,7 @@ type (
 const (
 	// in seconds
 	httpClientTimeout = 20
-	initTimeout       = 20
+	initTimeout       = 60
 )
 
 var (
@@ -194,7 +193,7 @@ func registerServiceInstanceHandler(w http.ResponseWriter, r *http.Request) {
 
 	var host string
 	if instanceDTO.Local {
-		host = generic_utils.LocalhostAddr
+		host = instanceId
 	} else {
 		host, _, err = net.SplitHostPort(r.RemoteAddr)
 		if err != nil {
@@ -209,6 +208,7 @@ func registerServiceInstanceHandler(w http.ResponseWriter, r *http.Request) {
 		Ip:              host,
 		PortTranslation: instanceDTO.PortTranslation,
 		Initialized:     instanceDTO.Static,
+		Local:           instanceDTO.Local,
 	}
 
 	initChansMap.Store(instanceId, initChan)
