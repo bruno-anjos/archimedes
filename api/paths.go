@@ -14,6 +14,8 @@ const (
 	ServiceInstancePath      = "/services/%s/%s"
 	ServiceInstanceAlivePath = "/services/%s/%s/alive"
 	InstancePath             = "/instances/%s"
+	DiscoverPath             = "/discover"
+	NeighborPath             = "/neighbor"
 )
 
 const (
@@ -25,12 +27,24 @@ const (
 
 const (
 	ArchimedesServiceName = "archimedes"
-	Port = 50000
+	Port                  = 50000
 )
 
 var (
 	DefaultHostPort = ArchimedesServiceName + ":" + strconv.Itoa(Port)
 )
+
+func GetServicesPath() string {
+	return PrefixPath + ServicesPath
+}
+
+func GetDiscoverPath() string {
+	return PrefixPath + DiscoverPath
+}
+
+func GetNeighborPath() string {
+	return PrefixPath + NeighborPath
+}
 
 func GetServicePath(serviceId string) string {
 	return PrefixPath + fmt.Sprintf(ServicePath, serviceId)
