@@ -11,6 +11,7 @@ import (
 // Route names
 const (
 	registerServiceName                  = "REGISTER_SERVICE"
+	addNeighborName                      = "ADD_NEIGHBOR"
 	deleteServiceName                    = "DELETE_SERVICE"
 	registerServiceInstanceName          = "REGISTER_SERVICE"
 	registerHeartbeatServiceInstanceName = "REGISTER_HEARTBEAT"
@@ -21,6 +22,7 @@ const (
 	getServiceInstanceName               = "GET_SERVICE_INSTANCE"
 	getInstanceName                      = "GET_INSTANCE"
 	changeInstanceStateName              = "CHANGE_INSTANCE_STATE"
+	discoverName                         = "DISCOVER"
 )
 
 // Path variables
@@ -119,5 +121,19 @@ var routes = []http_utils.Route{
 		Method:      http.MethodGet,
 		Pattern:     serviceInstanceRoute,
 		HandlerFunc: getServiceInstanceHandler,
+	},
+
+	{
+		Name:        discoverName,
+		Method:      http.MethodPost,
+		Pattern:     api.DiscoverPath,
+		HandlerFunc: discoverHandler,
+	},
+
+	{
+		Name:        addNeighborName,
+		Method:      http.MethodPost,
+		Pattern:     api.NeighborPath,
+		HandlerFunc: addNeighborHandler,
 	},
 }
