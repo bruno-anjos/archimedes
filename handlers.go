@@ -1,7 +1,10 @@
 package main
 
 import (
+	"crypto/sha256"
 	"encoding/json"
+	"fmt"
+	"math/rand"
 	"net"
 	"net/http"
 	"sync"
@@ -10,33 +13,57 @@ import (
 	"github.com/bruno-anjos/archimedes/api"
 	scheduler "github.com/bruno-anjos/scheduler/api"
 	"github.com/bruno-anjos/solution-utils/http_utils"
+	"github.com/google/uuid"
 	"github.com/gorilla/mux"
 	log "github.com/sirupsen/logrus"
 )
 
 type (
-	typeServicesMapKey   = string
-	typeServicesMapValue = *api.Service
+	typeLocalServicesMapKey   = string
+	typeLocalServicesMapValue = *api.Service
 
 	typeHeartbeatsMapKey   = string
 	typeHeartbeatsMapValue = *api.PairServiceIdStatus
 
 	typeInitChansMapValue = chan struct{}
+
+	typeNeighborsMapKey   = string
+	typeNeighborsMapValue = *Neighbor
+
+	Neighbor struct {
+		ArchimedesId string
+		Addr         string
+	}
+
+	typeIgnoreMapValue = *IgnoreMapEntry
+
+	IgnoreMapEntry struct {
+		IgnoreAddrs *sync.Map
+	}
 )
 
 const (
 	// in seconds
-	httpClientTimeout = 20
-	initTimeout       = 60
+	httpClientTimeout        = 20
+	initTimeout              = 60
+	sendServicesKnownTimeout = 20
+	maxHops                  = 2
 )
 
 var (
 	httpClient *http.Client
 
-	servicesMap   sync.Map
-	instancesMap  sync.Map
-	heartbeatsMap sync.Map
-	initChansMap  sync.Map
+	localServicesMap sync.Map
+	instancesMap     sync.Map
+	heartbeatsMap    sync.Map
+	initChansMap     sync.Map
+
+	neighbors sync.Map
+
+	ignoreMap     sync.Map
+	servicesTable *ServicesTable
+
+	archimedesId string
 )
 
 func init() {
@@ -44,12 +71,200 @@ func init() {
 		Timeout: httpClientTimeout * time.Second,
 	}
 
-	servicesMap = sync.Map{}
+	localServicesMap = sync.Map{}
 	heartbeatsMap = sync.Map{}
 	instancesMap = sync.Map{}
 	initChansMap = sync.Map{}
 
+	neighbors = sync.Map{}
+
+	ignoreMap = sync.Map{}
+	servicesTable = NewServicesTable()
+
+	archimedesId = uuid.New().String()
+
+	log.Infof("ARCHIMEDES ID: %s", archimedesId)
+
 	go instanceHeartbeatChecker()
+	go sendKnownServicesPeriodically()
+}
+
+func sendKnownServicesPeriodically() {
+	timer := time.NewTimer(sendServicesKnownTimeout * time.Second)
+
+	for {
+		<-timer.C
+
+		discoverMsg := buildDiscoverMsg()
+
+		neighbors.Range(func(key, value interface{}) bool {
+			neighbor := value.(typeNeighborsMapValue)
+
+			req := http_utils.BuildRequest(http.MethodPost, neighbor.Addr, api.GetDiscoverPath(), discoverMsg)
+			status, _ := http_utils.DoRequest(httpClient, req, nil)
+
+			if status != http.StatusOK {
+				log.Fatalf("got status %d", status)
+			}
+
+			return true
+		})
+
+		timer.Reset(sendServicesKnownTimeout * time.Second)
+	}
+}
+
+func buildDiscoverMsg() *api.DiscoverDTO {
+	var (
+		serviceIds    []string
+		services      []*api.ServiceDTO
+		instances     map[string][]string
+		instancesDTOs map[string]*api.InstanceDTO
+		h             = sha256.New()
+	)
+
+	instances = map[string][]string{}
+	instancesDTOs = map[string]*api.InstanceDTO{}
+
+	localServicesMap.Range(func(key, value interface{}) bool {
+		serviceId := key.(typeLocalServicesMapKey)
+		service := value.(typeLocalServicesMapValue)
+		serviceDTO := &api.ServiceDTO{
+			Ports: service.Ports,
+		}
+
+		serviceIds = append(serviceIds, serviceId)
+		services = append(services, serviceDTO)
+
+		h.Write([]byte(serviceId))
+
+		service.InstancesMap.Range(func(key, value interface{}) bool {
+			instance := value.(api.TypeInstancesMapValue)
+			instanceDTO := &api.InstanceDTO{
+				Static:          false,
+				PortTranslation: instance.PortTranslation,
+				Local:           false,
+			}
+
+			instances[serviceId] = append(instances[serviceId], instance.Id)
+			instancesDTOs[instance.Id] = instanceDTO
+
+			h.Write([]byte(instance.Id))
+
+			return true
+		})
+
+		return true
+	})
+
+	return &api.DiscoverDTO{
+		MessageId:     uuid.New(),
+		Host:          archimedesId,
+		ServicesIds:   serviceIds,
+		Services:      services,
+		Instances:     instances,
+		InstancesDTOs: instancesDTOs,
+		ServicesHash:  h.Sum(nil),
+		Hops:          0,
+		MaxHops:       maxHops,
+		Timestamp:     time.Now().Format(time.RFC3339),
+	}
+}
+
+func addNeighborHandler(w http.ResponseWriter, r *http.Request) {
+	neighbor := &Neighbor{}
+	err := json.NewDecoder(r.Body).Decode(neighbor)
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		log.Error(err)
+		panic(err)
+	}
+
+	if neighbor.ArchimedesId == "" {
+		panic("empty archimedes id")
+	}
+
+	log.Debugf("added neighbor %s in %s", neighbor.ArchimedesId, neighbor.Addr)
+
+	neighbors.Store(neighbor.ArchimedesId, neighbor)
+}
+
+func discoverHandler(w http.ResponseWriter, r *http.Request) {
+	log.Debug("handling request in discoverService handler")
+
+	discoverDTO := api.DiscoverDTO{}
+	err := json.NewDecoder(r.Body).Decode(&discoverDTO)
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		log.Error(err)
+		return
+	}
+
+	log.Debugf("received services from %s", r.RemoteAddr)
+
+	// increase hops on reception
+	discoverDTO.Hops++
+
+	servicesTable.UpdateTableWithDiscoverMessage(discoverDTO.Host, &discoverDTO)
+
+	newMap := sync.Map{}
+	newMap.Store(discoverDTO.Host, struct{}{})
+	entry := &IgnoreMapEntry{IgnoreAddrs: &newMap}
+	value, loaded := ignoreMap.LoadOrStore(discoverDTO.MessageId, entry)
+	if loaded {
+		entry = value.(typeIgnoreMapValue)
+		entry.IgnoreAddrs.Store(discoverDTO.MessageId, struct{}{})
+	} else {
+		go propagateMessageAsync(discoverDTO.Host, discoverDTO)
+	}
+}
+
+func propagateMessageAsync(neighborSent string, discover api.DiscoverDTO) {
+	randInt := rand.Intn(500)
+	time.Sleep(time.Duration(randInt) * time.Millisecond)
+
+	if discover.Hops+1 > discover.MaxHops {
+		return
+	}
+
+	neighbors.Range(func(key, value interface{}) bool {
+		neighborId := key.(typeNeighborsMapKey)
+
+		if neighborId == discover.Host {
+			log.Debugf("not propagating message %s due to %s being the host", discover.MessageId, neighborId)
+			return true
+		}
+
+		if neighborId == neighborSent {
+			log.Debugf("not propagating message %s due to %s being the neighbor that i received from",
+				discover.MessageId, neighborId)
+			return true
+		}
+
+		ignoreValue, ok := ignoreMap.Load(discover.MessageId)
+		if ok {
+			ignoreAddrs := ignoreValue.(typeIgnoreMapValue).IgnoreAddrs
+			_, ok = ignoreAddrs.Load(neighborId)
+			if ok {
+				log.Debugf("not propagating message %s to %s due to being in ignore map", discover.MessageId,
+					neighborId)
+				return true
+			}
+		}
+
+		neighbor := value.(typeNeighborsMapValue)
+
+		log.Debugf("propagating msg from %s to %s", neighborSent, neighborId)
+
+		req := http_utils.BuildRequest(http.MethodPost, neighbor.Addr, api.GetDiscoverPath(), discover)
+		status, _ := http_utils.DoRequest(httpClient, req, nil)
+
+		if status != http.StatusOK {
+			panic(fmt.Sprintf("got status %d while attempting to propagate", status))
+		}
+
+		return true
+	})
 }
 
 func instanceHeartbeatChecker() {
@@ -68,10 +283,10 @@ func instanceHeartbeatChecker() {
 			// case where instance didnt set online status since last status reset, so it has to be removed
 			if !pairServiceStatus.IsUp {
 				pairServiceStatus.Mutex.Unlock()
-				serviceValue, ok := servicesMap.Load(pairServiceStatus.ServiceId)
+				serviceValue, ok := localServicesMap.Load(pairServiceStatus.ServiceId)
 				// case where the instance will be removed and there is a service for that instance
 				if ok {
-					service := serviceValue.(typeServicesMapValue)
+					service := serviceValue.(typeLocalServicesMapValue)
 					service.InstancesMap.Delete(instanceId)
 					instancesMap.Delete(instanceId)
 				} else {
@@ -105,14 +320,14 @@ func cleanUnresponsiveInstance(serviceId, instanceId string, alive <-chan struct
 		log.Debugf("instance %s is up", instanceId)
 		return
 	case <-timer.C:
-		value, ok := servicesMap.Load(serviceId)
+		value, ok := localServicesMap.Load(serviceId)
 		if !ok {
 			log.Debugf("service %s was removed meanwhile, ignoring", serviceId)
 			return
 		}
 
 		log.Debugf("instance %s never reported, deleting it from service %s", instanceId, serviceId)
-		service := value.(typeServicesMapValue)
+		service := value.(typeLocalServicesMapValue)
 		removeInstance(service, instanceId)
 
 		log.Debugf("warning scheduler to remove instance %s", instanceId)
@@ -145,7 +360,7 @@ func registerServiceHandler(w http.ResponseWriter, r *http.Request) {
 		InstancesMap: &sync.Map{},
 	}
 
-	_, loaded := servicesMap.LoadOrStore(serviceId, service)
+	_, loaded := localServicesMap.LoadOrStore(serviceId, service)
 	if loaded {
 		w.WriteHeader(http.StatusConflict)
 		return
@@ -158,13 +373,13 @@ func deleteServiceHandler(w http.ResponseWriter, r *http.Request) {
 	log.Debug("handling request in deleteService handler")
 
 	serviceId := http_utils.ExtractPathVar(r, ServiceIdPathVar)
-	_, ok := servicesMap.Load(serviceId)
+	_, ok := localServicesMap.Load(serviceId)
 	if !ok {
 		w.WriteHeader(http.StatusNotFound)
 		return
 	}
 
-	servicesMap.Delete(serviceId)
+	localServicesMap.Delete(serviceId)
 
 	log.Debugf("deleted service %s", serviceId)
 }
@@ -174,13 +389,13 @@ func registerServiceInstanceHandler(w http.ResponseWriter, r *http.Request) {
 
 	serviceId := http_utils.ExtractPathVar(r, ServiceIdPathVar)
 
-	value, ok := servicesMap.Load(serviceId)
+	value, ok := localServicesMap.Load(serviceId)
 	if !ok {
 		w.WriteHeader(http.StatusNotFound)
 		return
 	}
 
-	service := value.(typeServicesMapValue)
+	service := value.(typeLocalServicesMapValue)
 
 	instanceId := http_utils.ExtractPathVar(r, InstanceIdPathVar)
 
@@ -234,13 +449,13 @@ func deleteServiceInstanceHandler(w http.ResponseWriter, r *http.Request) {
 	log.Debug("handling request in deleteServiceInstance handler")
 
 	serviceId := http_utils.ExtractPathVar(r, ServiceIdPathVar)
-	value, ok := servicesMap.Load(serviceId)
+	value, ok := localServicesMap.Load(serviceId)
 	if !ok {
 		w.WriteHeader(http.StatusNotFound)
 		return
 	}
 
-	service := value.(typeServicesMapValue)
+	service := value.(typeLocalServicesMapValue)
 
 	instanceId := http_utils.ExtractPathVar(r, InstanceIdPathVar)
 	_, ok = service.InstancesMap.Load(instanceId)
@@ -259,14 +474,14 @@ func heartbeatServiceInstanceHandler(w http.ResponseWriter, r *http.Request) {
 
 	serviceId := http_utils.ExtractPathVar(r, ServiceIdPathVar)
 
-	value, ok := servicesMap.Load(serviceId)
+	value, ok := localServicesMap.Load(serviceId)
 	if !ok {
 		log.Warnf("ignoring heartbeat since service %s wasn't registered", serviceId)
 		w.WriteHeader(http.StatusNotFound)
 		return
 	}
 
-	service := value.(typeServicesMapValue)
+	service := value.(typeLocalServicesMapValue)
 	instanceId := http_utils.ExtractPathVar(r, InstanceIdPathVar)
 
 	value, ok = service.InstancesMap.Load(instanceId)
@@ -278,7 +493,7 @@ func heartbeatServiceInstanceHandler(w http.ResponseWriter, r *http.Request) {
 
 	instance := value.(api.TypeInstancesMapValue)
 	if !instance.Initialized {
-		value, ok := initChansMap.Load(instance.Id)
+		value, ok = initChansMap.Load(instance.Id)
 		if !ok {
 			log.Warnf("ignoring heartbeat from instance %s since it didnt have an init channel", instanceId)
 			w.WriteHeader(http.StatusNotFound)
@@ -327,9 +542,9 @@ func getAllServicesHandler(w http.ResponseWriter, _ *http.Request) {
 
 	services := map[string]*api.ServiceDTO{}
 
-	servicesMap.Range(func(key, value interface{}) bool {
-		serviceId := key.(typeServicesMapKey)
-		service := value.(typeServicesMapValue)
+	localServicesMap.Range(func(key, value interface{}) bool {
+		serviceId := key.(typeLocalServicesMapKey)
+		service := value.(typeLocalServicesMapValue)
 		services[serviceId] = &api.ServiceDTO{
 			Ports: service.Ports,
 		}
@@ -344,13 +559,13 @@ func getAllServiceInstancesHandler(w http.ResponseWriter, r *http.Request) {
 
 	serviceId := http_utils.ExtractPathVar(r, ServiceIdPathVar)
 
-	value, ok := servicesMap.Load(serviceId)
+	value, ok := localServicesMap.Load(serviceId)
 	if !ok {
 		w.WriteHeader(http.StatusNotFound)
 		return
 	}
 
-	service := value.(typeServicesMapValue)
+	service := value.(typeLocalServicesMapValue)
 	instances := map[api.TypeInstancesMapKey]api.TypeInstancesMapValue{}
 	var instanceIds []api.TypeInstancesMapKey
 
@@ -377,13 +592,13 @@ func getServiceInstanceHandler(w http.ResponseWriter, r *http.Request) {
 
 	serviceId := http_utils.ExtractPathVar(r, ServiceIdPathVar)
 
-	value, ok := servicesMap.Load(serviceId)
+	value, ok := localServicesMap.Load(serviceId)
 	if !ok {
 		w.WriteHeader(http.StatusNotFound)
 		return
 	}
 
-	service := value.(typeServicesMapValue)
+	service := value.(typeLocalServicesMapValue)
 	instanceId := http_utils.ExtractPathVar(r, InstanceIdPathVar)
 
 	value, ok = service.InstancesMap.Load(instanceId)
