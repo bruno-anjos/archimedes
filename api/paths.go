@@ -7,6 +7,8 @@ import (
 
 // Paths
 const (
+	// TODO make this unexported probably
+
 	PrefixPath = "/archimedes"
 
 	ServicesPath             = "/services"
