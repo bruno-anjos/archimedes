@@ -248,6 +248,9 @@ func registerServiceInstanceHandler(w http.ResponseWriter, r *http.Request) {
 	} else {
 		log.Debugf("added STATIC instance %s", instanceId)
 	}
+
+	sendServicesTable()
+	log.Debugf("added instance %s", instanceId)
 }
 
 func deleteServiceInstanceHandler(w http.ResponseWriter, r *http.Request) {
