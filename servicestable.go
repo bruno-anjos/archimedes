@@ -2,7 +2,6 @@ package main
 
 import (
 	"sync"
-	"time"
 
 	"github.com/bruno-anjos/archimedes/api"
 	"github.com/google/uuid"
@@ -17,7 +16,6 @@ type (
 		NumberOfHops int
 		MaxHops      int
 		Version      int
-		Timestamp    time.Time
 		EntryLock    *sync.RWMutex
 	}
 )
@@ -73,7 +71,7 @@ func (st *ServicesTable) UpdateService(serviceId, host, hostAddr string, service
 	entry.EntryLock.RLock()
 
 	// ignore messages with no new information
-	if version < entry.Version {
+	if version <= entry.Version {
 		log.Debug("discarding message due to version being older or equal")
 		return false
 	}
