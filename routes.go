@@ -23,6 +23,7 @@ const (
 	getInstanceName                      = "GET_INSTANCE"
 	changeInstanceStateName              = "CHANGE_INSTANCE_STATE"
 	discoverName                         = "DISCOVER"
+	whoAreYouName                        = "WHO_ARE_YOU"
 )
 
 // Path variables
@@ -135,5 +136,12 @@ var routes = []http_utils.Route{
 		Method:      http.MethodPost,
 		Pattern:     api.NeighborPath,
 		HandlerFunc: addNeighborHandler,
+	},
+
+	{
+		Name:        whoAreYouName,
+		Method:      http.MethodGet,
+		Pattern:     api.WhoAreYouPath,
+		HandlerFunc: whoAreYouHandler,
 	},
 }
