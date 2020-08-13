@@ -54,6 +54,8 @@ func ResolveServiceInArchimedes(hostPort string) (resolvedHostPort string, err e
 		panic(err)
 	}
 
+	log.Debugf("got service %+v", service)
+
 	portWithProto, err := nat.NewPort(genericutils.TCP, port)
 	if err != nil {
 		panic(err)
@@ -109,6 +111,8 @@ func resolveInstanceInArchimedes(httpClient *http.Client, hostPort string) (reso
 	if err != nil {
 		panic(err)
 	}
+
+	log.Debugf("got instance %+v", completedInstance)
 
 	portWithProto, err := nat.NewPort(genericutils.TCP, port)
 	if err != nil {
