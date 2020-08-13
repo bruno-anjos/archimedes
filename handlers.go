@@ -77,6 +77,7 @@ func init() {
 }
 
 func addNeighborHandler(w http.ResponseWriter, r *http.Request) {
+	log.Debug("handling add neighbor request")
 	neighborDTO := &api.NeighborDTO{}
 	err := json.NewDecoder(r.Body).Decode(neighborDTO)
 	if err != nil {
