@@ -16,16 +16,15 @@ type InstanceDTO struct {
 }
 
 type DiscoverDTO struct {
-	MessageId     uuid.UUID
-	Host          string
-	ServicesIds   []string
-	Services      []*ServiceDTO
-	Instances     map[string][]string
-	InstancesDTOs map[string]*InstanceDTO
-	ServicesHash  []byte
-	Hops          int
-	MaxHops       int
-	Timestamp     string
+	MessageId          uuid.UUID
+	Host               string
+	HostAddr           string
+	NeighborSent       string
+	Services           map[string]*Service
+	ServiceToInstances map[string][]string
+	Instances          map[string]*Instance
+	Hops               int
+	MaxHops            int
 }
 
 type NeighborDTO struct {
