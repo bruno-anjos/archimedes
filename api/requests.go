@@ -28,6 +28,5 @@ type DiscoverDTO struct {
 }
 
 type NeighborDTO struct {
-	ArchimedesId string
 	Addr         string
 }
