@@ -388,6 +388,7 @@ func getInstanceHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func whoAreYouHandler(w http.ResponseWriter, _ *http.Request) {
+	log.Debug("handling whoAreYou request")
 	http_utils.SendJSONReplyOK(w, archimedesId)
 }
 
