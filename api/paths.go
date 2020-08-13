@@ -16,6 +16,7 @@ const (
 	InstancePath             = "/instances/%s"
 	DiscoverPath             = "/discover"
 	NeighborPath             = "/neighbor"
+	WhoAreYouPath            = "/who"
 )
 
 const (
@@ -44,6 +45,10 @@ func GetDiscoverPath() string {
 
 func GetNeighborPath() string {
 	return PrefixPath + NeighborPath
+}
+
+func GetWhoAreYouPath() string {
+	return PrefixPath + WhoAreYouPath
 }
 
 func GetServicePath(serviceId string) string {
