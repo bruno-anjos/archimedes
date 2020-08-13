@@ -42,7 +42,10 @@ var (
 		_instanceIdPathVarFormatted)
 	serviceInstanceAliveRoute = fmt.Sprintf(api.ServiceInstanceAlivePath, _serviceIdPathVarFormatted,
 		_instanceIdPathVarFormatted)
-	instanceRoute = fmt.Sprintf(api.InstancePath, _instanceIdPathVarFormatted)
+	instanceRoute  = fmt.Sprintf(api.InstancePath, _instanceIdPathVarFormatted)
+	discoverRoute  = api.DiscoverPath
+	neighborRoute  = api.NeighborPath
+	whoAreYouRoute = api.WhoAreYouPath
 )
 
 var routes = []http_utils.Route{
@@ -127,21 +130,21 @@ var routes = []http_utils.Route{
 	{
 		Name:        discoverName,
 		Method:      http.MethodPost,
-		Pattern:     api.DiscoverPath,
+		Pattern:     discoverRoute,
 		HandlerFunc: discoverHandler,
 	},
 
 	{
 		Name:        addNeighborName,
 		Method:      http.MethodPost,
-		Pattern:     api.NeighborPath,
+		Pattern:     neighborRoute,
 		HandlerFunc: addNeighborHandler,
 	},
 
 	{
 		Name:        whoAreYouName,
 		Method:      http.MethodGet,
-		Pattern:     api.WhoAreYouPath,
+		Pattern:     whoAreYouRoute,
 		HandlerFunc: whoAreYouHandler,
 	},
 }
