@@ -226,10 +226,11 @@ func (st *ServicesTable) AddInstance(serviceId, instanceId string, instance *api
 	}
 
 	entry := value.(typeServicesTableMapValue)
-	entry.EntryLock.RLock()
-	defer entry.EntryLock.RUnlock()
+	entry.EntryLock.Lock()
+	defer entry.EntryLock.Unlock()
 
 	entry.Instances.Store(instanceId, instance)
+	entry.Service.Version++
 
 	st.instancesMap.Store(instanceId, instance)
 
