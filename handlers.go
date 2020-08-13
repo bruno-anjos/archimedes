@@ -90,8 +90,9 @@ func addNeighborHandler(w http.ResponseWriter, r *http.Request) {
 		panic("empty addr")
 	}
 
+	archimedesAddr := neighborDTO.Addr + ":" + strconv.Itoa(api.Port)
 	var nodeArchimedesId string
-	req := http_utils.BuildRequest(http.MethodGet, neighborDTO.Addr+":"+strconv.Itoa(api.Port), api.GetWhoAreYouPath(),
+	req := http_utils.BuildRequest(http.MethodGet, archimedesAddr, api.GetWhoAreYouPath(),
 		nil)
 	status, _ := http_utils.DoRequest(httpClient, req, &nodeArchimedesId)
 
@@ -101,7 +102,7 @@ func addNeighborHandler(w http.ResponseWriter, r *http.Request) {
 
 	neighbor := &Neighbor{
 		ArchimedesId: nodeArchimedesId,
-		Addr:         neighborDTO.Addr,
+		Addr:         archimedesAddr,
 	}
 
 	log.Debugf("added neighbor %s in %s", neighbor.ArchimedesId, neighbor.Addr)
