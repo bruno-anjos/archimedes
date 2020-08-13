@@ -6,6 +6,7 @@ import (
 	"math/rand"
 	"net"
 	"net/http"
+	"strconv"
 	"sync"
 	"time"
 
@@ -76,16 +77,30 @@ func init() {
 }
 
 func addNeighborHandler(w http.ResponseWriter, r *http.Request) {
-	neighbor := &Neighbor{}
-	err := json.NewDecoder(r.Body).Decode(neighbor)
+	neighborDTO := &api.NeighborDTO{}
+	err := json.NewDecoder(r.Body).Decode(neighborDTO)
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		log.Error(err)
 		panic(err)
 	}
 
-	if neighbor.ArchimedesId == "" {
-		panic("empty archimedes id")
+	if neighborDTO.Addr == "" {
+		panic("empty addr")
+	}
+
+	var nodeArchimedesId string
+	req := http_utils.BuildRequest(http.MethodGet, neighborDTO.Addr+":"+strconv.Itoa(api.Port), api.GetWhoAreYouPath(),
+		nil)
+	status, _ := http_utils.DoRequest(httpClient, req, &nodeArchimedesId)
+
+	if status != http.StatusOK {
+		log.Fatalf("got status code %d while asking archimedes node its id", status)
+	}
+
+	neighbor := &Neighbor{
+		ArchimedesId: nodeArchimedesId,
+		Addr:         neighborDTO.Addr,
 	}
 
 	log.Debugf("added neighbor %s in %s", neighbor.ArchimedesId, neighbor.Addr)
