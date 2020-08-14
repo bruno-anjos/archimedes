@@ -128,7 +128,9 @@ func discoverHandler(w http.ResponseWriter, r *http.Request) {
 
 	if discoverDTO.Hops == 1 {
 		discoverDTO.HostAddr, _, err = net.SplitHostPort(r.RemoteAddr)
-		panic(err)
+		if err != nil {
+			panic(err)
+		}
 	}
 
 	servicesTable.UpdateTableWithDiscoverMessage(discoverDTO.Host, &discoverDTO)
