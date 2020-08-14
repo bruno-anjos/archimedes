@@ -18,7 +18,7 @@ const (
 	HeartbeatCheckerTimeout = 60
 )
 
-func ResolveServiceInArchimedes(httpClient *http.Client, hostPort string) (resolvedHostPort string, err error) {
+func ResolveServiceInArchimedes(httpClient *http.Client, hostPort string) (string, error) {
 	host, port, err := net.SplitHostPort(hostPort)
 	if err != nil {
 		log.Error("hostport: ", hostPort)
@@ -50,7 +50,11 @@ func ResolveServiceInArchimedes(httpClient *http.Client, hostPort string) (resol
 			fmt.Sprintf("got status %d while resolving %s in archimedes", status, hostPort))
 	}
 
-	return resolved.Host + ":" + resolved.Port, nil
+	resolvedHostPort := resolved.Host + ":" + resolved.Port
+
+	log.Debugf("resolved %s to %s", hostPort, resolvedHostPort)
+
+	return resolvedHostPort, nil
 }
 
 func SendHeartbeatInstanceToArchimedes(archimedesHostPort string) {
