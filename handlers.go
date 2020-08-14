@@ -127,7 +127,7 @@ func discoverHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	log.Debugf("received services from %s", r.RemoteAddr)
+	log.Debugf("got discover message %+v", discoverDTO)
 
 	remoteAddr, _, err := net.SplitHostPort(r.RemoteAddr)
 	if err != nil {
@@ -511,6 +511,10 @@ func postprocessMessage(discoverMsg *api.DiscoverDTO) {
 func sendServicesTable() {
 	discoverMsg := servicesTable.ToDiscoverMsg(archimedesId)
 
+	if discoverMsg == nil {
+		return
+	}
+
 	neighbors.Range(func(key, value interface{}) bool {
 		neighbor := value.(typeNeighborsMapValue)
 
@@ -527,6 +531,10 @@ func sendServicesTable() {
 
 func sendServicesTableToNeighbor(neighbor *Neighbor) {
 	discoverMsg := servicesTable.ToDiscoverMsg(archimedesId)
+
+	if discoverMsg == nil {
+		return
+	}
 
 	req := http_utils.BuildRequest(http.MethodPost, neighbor.Addr, api.GetDiscoverPath(), discoverMsg)
 	status, _ := http_utils.DoRequest(httpClient, req, nil)

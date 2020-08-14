@@ -88,7 +88,6 @@ func NewServicesTable() *ServicesTable {
 }
 
 func (st *ServicesTable) UpdateService(serviceId string, newEntry *api.ServicesTableEntryDTO) bool {
-
 	value, ok := st.servicesMap.Load(serviceId)
 	if !ok {
 		log.Fatalf("service %s doesnt exist", serviceId)
@@ -96,6 +95,8 @@ func (st *ServicesTable) UpdateService(serviceId string, newEntry *api.ServicesT
 
 	entry := value.(typeServicesTableMapValue)
 	entry.EntryLock.RLock()
+
+	log.Debugf("got service on version %d, have %d", entry.Version, newEntry.Version)
 
 	// ignore messages with no new information
 	if newEntry.Version <= entry.Version {
@@ -388,6 +389,10 @@ func (st *ServicesTable) ToDiscoverMsg(archimedesId string) *api.DiscoverDTO {
 
 		return true
 	})
+
+	if len(entries) == 0 {
+		return nil
+	}
 
 	return &api.DiscoverDTO{
 		MessageId:    uuid.New(),
