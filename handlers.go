@@ -615,6 +615,10 @@ func cleanUnresponsiveInstance(serviceId, instanceId string, alive <-chan struct
 			log.Warnf("while trying to remove instance %s after timeout, scheduler returned status %d",
 				instanceId, status)
 		}
+
+		if len(servicesTable.GetAllServiceInstances(serviceId)) == 0 {
+			servicesTable.DeleteService(serviceId)
+		}
 	}
 }
 
