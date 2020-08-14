@@ -169,8 +169,8 @@ func registerServiceHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	servicesTable.AddService(serviceId, archimedesId, api.DefaultHostPort, service, map[string]*api.Instance{},
-		0, maxHops, 0)
+	servicesTable.AddService(serviceId, archimedesId, api.DefaultHostPort, service, map[string][]string{},
+		map[string]*api.Instance{}, 0, maxHops, 0)
 	sendServicesTable()
 
 	log.Debugf("added service %s", serviceId)
