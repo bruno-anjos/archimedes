@@ -1,10 +1,8 @@
 package api
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
-	"math/rand"
 	"net"
 	"net/http"
 	"os"
@@ -33,83 +31,18 @@ func ResolveServiceInArchimedes(httpClient *http.Client, hostPort string) (resol
 		}
 	}
 
-	archReq := http_utils.BuildRequest(http.MethodGet, DefaultHostPort, GetServicePath(host), nil)
+	toResolve := ToResolveDTO{
+		Host: host,
+		Port: nat.Port(port + "/tcp"),
+	}
+	archReq := http_utils.BuildRequest(http.MethodGet, DefaultHostPort, GetResolvePath(), toResolve)
 
-	status, resp := http_utils.DoRequest(httpClient, archReq, nil)
+	resolved := ResolvedDTO{}
+	status, _ := http_utils.DoRequest(httpClient, archReq, &resolved)
 
 	switch status {
 	case http.StatusNotFound:
-		log.Debugf("could not resolve service %s", hostPort)
-		resolvedHostPort, err = resolveInstanceInArchimedes(httpClient, hostPort)
-		if err != nil {
-			return "", err
-		}
-		return resolvedHostPort, nil
-	case http.StatusOK:
-	default:
-		return "", errors.New(
-			fmt.Sprintf("got status %d while resolving %s in archimedes", resp.StatusCode, hostPort))
-	}
-
-	var instances map[string]*Instance
-	err = json.NewDecoder(resp.Body).Decode(&instances)
-	if err != nil {
-		panic(err)
-	}
-
-	log.Debugf("got instances %+v", instances)
-
-	portWithProto, err := nat.NewPort(genericutils.TCP, port)
-	if err != nil {
-		panic(err)
-	}
-
-	var randInstance *Instance
-	randNum := rand.Intn(len(instances))
-
-	for _, instance := range instances {
-		if randNum == 0 {
-			randInstance = instance
-		} else {
-			randNum--
-		}
-	}
-
-	if randInstance == nil {
-		log.Fatalf("could not find instance for service %s", host)
-		return
-	}
-
-	var portResolved string
-	if randInstance.Local {
-		portResolved = portWithProto.Port()
-	} else {
-		portNATResolved, ok := randInstance.PortTranslation[portWithProto]
-		if !ok {
-			log.Fatalf("instance %s does not have mapping for port %d", host, portWithProto)
-		}
-		portResolved = portNATResolved[0].HostPort
-	}
-
-	resolvedHostPort = randInstance.Ip + ":" + portResolved
-
-	log.Debugf("resolved %s to %s", hostPort, resolvedHostPort)
-
-	return resolvedHostPort, nil
-}
-
-func resolveInstanceInArchimedes(httpClient *http.Client, hostPort string) (resolvedHostPort string, err error) {
-	host, port, err := net.SplitHostPort(hostPort)
-	if err != nil {
-		panic(err)
-	}
-
-	archReq := http_utils.BuildRequest(http.MethodGet, DefaultHostPort, GetInstancePath(host), nil)
-
-	status, resp := http_utils.DoRequest(httpClient, archReq, nil)
-	switch status {
-	case http.StatusNotFound:
-		log.Debugf("could not resolve instance %s", hostPort)
+		log.Debugf("could not resolve %s", hostPort)
 		return hostPort, nil
 	case http.StatusOK:
 	default:
@@ -117,35 +50,7 @@ func resolveInstanceInArchimedes(httpClient *http.Client, hostPort string) (reso
 			fmt.Sprintf("got status %d while resolving %s in archimedes", status, hostPort))
 	}
 
-	var instance Instance
-	err = json.NewDecoder(resp.Body).Decode(&instance)
-	if err != nil {
-		panic(err)
-	}
-
-	log.Debugf("got instance %+v", instance)
-
-	portWithProto, err := nat.NewPort(genericutils.TCP, port)
-	if err != nil {
-		panic(err)
-	}
-
-	var portResolved string
-	if instance.Local {
-		portResolved = portWithProto.Port()
-	} else {
-		portNATResolved, ok := instance.PortTranslation[portWithProto]
-		if !ok {
-			log.Fatalf("instance %s does not have mapping for port %d", host, portWithProto)
-		}
-		portResolved = portNATResolved[0].HostPort
-	}
-
-	resolvedHostPort = instance.Ip + ":" + portResolved
-
-	log.Debugf("resolved %s to %s", hostPort, resolvedHostPort)
-
-	return resolvedHostPort, nil
+	return resolved.Host + ":" + resolved.Port, nil
 }
 
 func SendHeartbeatInstanceToArchimedes(archimedesHostPort string) {

@@ -28,5 +28,10 @@ type DiscoverDTO struct {
 }
 
 type NeighborDTO struct {
-	Addr         string
+	Addr string
+}
+
+type ToResolveDTO struct {
+	Host string
+	Port nat.Port
 }

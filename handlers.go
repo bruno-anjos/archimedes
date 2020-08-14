@@ -12,6 +12,7 @@ import (
 	"github.com/bruno-anjos/archimedes/api"
 	scheduler "github.com/bruno-anjos/scheduler/api"
 	"github.com/bruno-anjos/solution-utils/http_utils"
+	"github.com/docker/go-connections/nat"
 	"github.com/google/uuid"
 	"github.com/gorilla/mux"
 	log "github.com/sirupsen/logrus"
@@ -126,7 +127,8 @@ func discoverHandler(w http.ResponseWriter, r *http.Request) {
 	discoverDTO.Hops++
 
 	if discoverDTO.Hops == 1 {
-		discoverDTO.HostAddr = r.RemoteAddr
+		discoverDTO.HostAddr, _, err = net.SplitHostPort(r.RemoteAddr)
+		panic(err)
 	}
 
 	servicesTable.UpdateTableWithDiscoverMessage(discoverDTO.Host, &discoverDTO)
@@ -393,8 +395,64 @@ func whoAreYouHandler(w http.ResponseWriter, _ *http.Request) {
 	http_utils.SendJSONReplyOK(w, archimedesId)
 }
 
-func getServicesTable(w http.ResponseWriter, _ *http.Request) {
+func getServicesTableHandler(w http.ResponseWriter, _ *http.Request) {
 	http_utils.SendJSONReplyOK(w, servicesTable.ToDiscoverMsg(archimedesId))
+}
+
+func resolveHandler(w http.ResponseWriter, r *http.Request) {
+	toResolve := api.ToResolveDTO{}
+	err := json.NewDecoder(r.Body).Decode(&toResolve)
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	service, sOk := servicesTable.GetService(toResolve.Host)
+	if !sOk {
+		instance, iOk := servicesTable.GetInstance(toResolve.Host)
+		if !iOk {
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
+
+		resolved, ok := resolveInstance(toResolve.Host, toResolve.Port, instance)
+		if !ok {
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
+
+		http_utils.SendJSONReplyOK(w, resolved)
+		return
+	}
+
+	instances := servicesTable.GetAllServiceInstances(service.Id)
+
+	if len(instances) == 0 {
+		log.Debugf("no instances for service %s", service.Id)
+		w.WriteHeader(http.StatusNotFound)
+		return
+	}
+
+	var randInstance *api.Instance
+	randNum := rand.Intn(len(instances))
+	for _, instance := range instances {
+		if randNum == 0 {
+			randInstance = instance
+		} else {
+			randNum--
+		}
+	}
+
+	resolved, ok := resolveInstance(toResolve.Host, toResolve.Port, randInstance)
+	if !ok {
+		w.WriteHeader(http.StatusNotFound)
+		return
+	}
+
+	http_utils.SendJSONReplyOK(w, api.ResolvedDTO{
+		Host: resolved.Host,
+		Port: resolved.Port,
+	})
 }
 
 var (
@@ -555,5 +613,24 @@ func cleanUnresponsiveInstance(serviceId, instanceId string, alive <-chan struct
 			log.Warnf("while trying to remove instance %s after timeout, scheduler returned status %d",
 				instanceId, status)
 		}
+	}
+}
+
+func resolveInstance(originalHost string, originalPort nat.Port, instance *api.Instance) (*api.ResolvedDTO, bool) {
+	if instance.Local {
+		return &api.ResolvedDTO{
+			Host: originalHost,
+			Port: originalPort.Port(),
+		}, true
+	} else {
+		portNatResolved, ok := instance.PortTranslation[originalPort]
+		if !ok {
+			return nil, false
+		}
+
+		return &api.ResolvedDTO{
+			Host: instance.Ip,
+			Port: portNatResolved[0].HostPort,
+		}, true
 	}
 }

@@ -24,8 +24,8 @@ const (
 	changeInstanceStateName              = "CHANGE_INSTANCE_STATE"
 	discoverName                         = "DISCOVER"
 	whoAreYouName                        = "WHO_ARE_YOU"
-	getTableName                   = "GET_TABLE"
-
+	getTableName                         = "GET_TABLE"
+	resolveName                          = "RESOLVE"
 )
 
 // Path variables
@@ -49,6 +49,7 @@ var (
 	neighborRoute  = api.NeighborPath
 	whoAreYouRoute = api.WhoAreYouPath
 	tableRoute     = api.TablePath
+	resolveRoute   = api.ResolvePath
 )
 
 var routes = []http_utils.Route{
@@ -155,6 +156,13 @@ var routes = []http_utils.Route{
 		Name:        getTableName,
 		Method:      http.MethodGet,
 		Pattern:     tableRoute,
-		HandlerFunc: getServicesTable,
+		HandlerFunc: getServicesTableHandler,
+	},
+
+	{
+		Name:        resolveName,
+		Method:      http.MethodPost,
+		Pattern:     resolveRoute,
+		HandlerFunc: resolveHandler,
 	},
 }

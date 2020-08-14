@@ -102,6 +102,9 @@ func (st *ServicesTable) UpdateService(serviceId, host, hostAddr string, service
 	thisServiceInstances := serviceToInstances[serviceId]
 	for _, instanceId := range thisServiceInstances {
 		instance := instances[instanceId]
+		if !instance.Local {
+			instance.Ip = hostAddr
+		}
 		newInstancesMap.Store(instanceId, instance)
 		st.instancesMap.Store(instanceId, instance)
 	}
@@ -151,6 +154,9 @@ func (st *ServicesTable) AddService(serviceId string, host, hostAddr string, ser
 	thisServiceInstances := serviceToInstances[serviceId]
 	for _, instanceId := range thisServiceInstances {
 		instance := instances[instanceId]
+		if !instance.Local {
+			instance.Ip = hostAddr
+		}
 		newInstancesMap.Store(instanceId, instance)
 		st.instancesMap.Store(instanceId, instance)
 	}
@@ -385,7 +391,9 @@ func (st *ServicesTable) ToDiscoverMsg(archimedesId string) *api.DiscoverDTO {
 			instanceId := key.(typeInstancesMapKey)
 			instance := value.(typeInstancesMapValue)
 			serviceToInstances[serviceId] = append(serviceToInstances[serviceId], instanceId)
-			instances[instanceId] = instance
+			instanceCopy := *instance
+			instanceCopy.Local = false
+			instances[instanceId] = &instanceCopy
 			return true
 		})
 

@@ -19,7 +19,8 @@ const (
 	DiscoverPath             = "/discover"
 	NeighborPath             = "/neighbor"
 	WhoAreYouPath            = "/who"
-	TablePath = "/table"
+	TablePath                = "/table"
+	ResolvePath              = "/resolve"
 )
 
 const (
@@ -72,4 +73,8 @@ func GetServiceInstanceAlivePath(serviceId, instanceId string) string {
 
 func GetTablePath() string {
 	return PrefixPath + TablePath
+}
+
+func GetResolvePath() string {
+	return PrefixPath + ResolvePath
 }
