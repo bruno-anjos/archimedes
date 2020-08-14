@@ -19,6 +19,7 @@ const (
 	DiscoverPath             = "/discover"
 	NeighborPath             = "/neighbor"
 	WhoAreYouPath            = "/who"
+	TablePath = "/table"
 )
 
 const (
@@ -67,4 +68,8 @@ func GetServiceInstancePath(serviceId, instanceId string) string {
 
 func GetServiceInstanceAlivePath(serviceId, instanceId string) string {
 	return PrefixPath + fmt.Sprintf(ServiceInstanceAlivePath, serviceId, instanceId)
+}
+
+func GetTablePath() string {
+	return PrefixPath + TablePath
 }

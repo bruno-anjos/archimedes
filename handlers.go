@@ -250,7 +250,7 @@ func registerServiceInstanceHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	sendServicesTable()
-	log.Debugf("added instance %s", instanceId)
+	log.Debugf("added instance %s to service %s", instanceId, serviceId)
 }
 
 func deleteServiceInstanceHandler(w http.ResponseWriter, r *http.Request) {
@@ -391,6 +391,10 @@ func getInstanceHandler(w http.ResponseWriter, r *http.Request) {
 func whoAreYouHandler(w http.ResponseWriter, _ *http.Request) {
 	log.Debug("handling whoAreYou request")
 	http_utils.SendJSONReplyOK(w, archimedesId)
+}
+
+func getServicesTable(w http.ResponseWriter, _ *http.Request) {
+	http_utils.SendJSONReplyOK(w, servicesTable.ToDiscoverMsg(archimedesId))
 }
 
 var (
