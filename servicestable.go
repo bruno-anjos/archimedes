@@ -60,7 +60,8 @@ func NewServicesTable() *ServicesTable {
 }
 
 func (st *ServicesTable) UpdateService(serviceId, host, hostAddr string, service *api.Service,
-	instances map[string]*api.Instance, numberOfHops, maxHops, version int) bool {
+	serviceToInstances map[string][]string, instances map[string]*api.Instance, numberOfHops, maxHops,
+	version int) bool {
 
 	value, ok := st.servicesMap.Load(serviceId)
 	if !ok {
@@ -98,7 +99,9 @@ func (st *ServicesTable) UpdateService(serviceId, host, hostAddr string, service
 	})
 
 	newInstancesMap := &sync.Map{}
-	for instanceId, instance := range instances {
+	thisServiceInstances := serviceToInstances[serviceId]
+	for _, instanceId := range thisServiceInstances {
+		instance := instances[instanceId]
 		newInstancesMap.Store(instanceId, instance)
 		st.instancesMap.Store(instanceId, instance)
 	}
@@ -115,7 +118,8 @@ func (st *ServicesTable) UpdateService(serviceId, host, hostAddr string, service
 }
 
 func (st *ServicesTable) AddService(serviceId string, host, hostAddr string, service *api.Service,
-	instances map[string]*api.Instance, numberOfHops, maxHops, version int) (added bool) {
+	serviceToInstances map[string][]string, instances map[string]*api.Instance, numberOfHops, maxHops,
+	version int) (added bool) {
 
 	_, ok := st.servicesMap.Load(serviceId)
 	if ok {
@@ -144,7 +148,9 @@ func (st *ServicesTable) AddService(serviceId string, host, hostAddr string, ser
 	newTableEntry.Service = service
 
 	newInstancesMap := &sync.Map{}
-	for instanceId, instance := range instances {
+	thisServiceInstances := serviceToInstances[serviceId]
+	for _, instanceId := range thisServiceInstances {
+		instance := instances[instanceId]
 		newInstancesMap.Store(instanceId, instance)
 		st.instancesMap.Store(instanceId, instance)
 	}
@@ -319,6 +325,7 @@ func (st *ServicesTable) UpdateTableWithDiscoverMessage(neighbor string, discove
 
 	var (
 		host, hostAddr          string
+		serviceToInstances      map[string][]string
 		instances               map[string]*api.Instance
 		hops, sMaxHops, version int
 	)
@@ -336,17 +343,19 @@ func (st *ServicesTable) UpdateTableWithDiscoverMessage(neighbor string, discove
 		hops = discoverMsg.Hops
 		sMaxHops = discoverMsg.MaxHops
 		version = service.Version
+		serviceToInstances = discoverMsg.ServiceToInstances
 
 		_, ok := st.servicesMap.Load(serviceId)
 		if ok {
 			log.Debugf("service %s already existed, updating", serviceId)
-			updated := st.UpdateService(serviceId, host, hostAddr, service, instances, hops, sMaxHops, version)
+			updated := st.UpdateService(serviceId, host, hostAddr, service, serviceToInstances, instances, hops,
+				sMaxHops, version)
 			if updated {
 				changed = true
 			}
 		}
 
-		st.AddService(serviceId, host, hostAddr, service, instances, hops, sMaxHops, version)
+		st.AddService(serviceId, host, hostAddr, service, serviceToInstances, instances, hops, sMaxHops, version)
 		changed = true
 	}
 
