@@ -15,16 +15,18 @@ type InstanceDTO struct {
 	Local           bool
 }
 
+type ServicesTableEntryDTO struct {
+	Host, HostAddr string
+	Service        *Service
+	Instances      map[string]*Instance
+	NumberOfHops   int
+	MaxHops        int
+	Version        int
+}
 type DiscoverDTO struct {
-	MessageId          uuid.UUID
-	Host               string
-	HostAddr           string
-	NeighborSent       string
-	Services           map[string]*Service
-	ServiceToInstances map[string][]string
-	Instances          map[string]*Instance
-	Hops               int
-	MaxHops            int
+	MessageId    uuid.UUID
+	NeighborSent string
+	Entries      map[string]*ServicesTableEntryDTO
 }
 
 type NeighborDTO struct {

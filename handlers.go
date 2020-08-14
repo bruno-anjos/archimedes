@@ -121,31 +121,27 @@ func discoverHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	log.Debugf("received services from %s", r.RemoteAddr)
-
-	// increase hops on reception
-	discoverDTO.Hops++
-
-	if discoverDTO.Hops == 1 {
-		discoverDTO.HostAddr, _, err = net.SplitHostPort(r.RemoteAddr)
-		if err != nil {
-			panic(err)
-		}
-	}
-
-	servicesTable.UpdateTableWithDiscoverMessage(discoverDTO.Host, &discoverDTO)
-
-	_, loaded := messagesReceived.Load(discoverDTO.MessageId)
-	if loaded {
+	_, ok := messagesReceived.Load(discoverDTO.MessageId)
+	if ok {
 		log.Debugf("repeated message %s, ignoring...", discoverDTO.MessageId)
 		return
-	} else {
-		if discoverDTO.Hops+1 > discoverDTO.MaxHops {
-			log.Debugf("message %s achieved max hops, not propagating", discoverDTO.MessageId)
-			return
-		}
-		go propagateMessageAsync(discoverDTO.NeighborSent, discoverDTO)
 	}
+
+	log.Debugf("received services from %s", r.RemoteAddr)
+
+	remoteAddr, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		panic(err)
+	}
+
+	preprocessMessage(remoteAddr, &discoverDTO)
+
+	servicesTable.UpdateTableWithDiscoverMessage(discoverDTO.NeighborSent, &discoverDTO)
+
+	messagesReceived.Store(discoverDTO.MessageId, struct{}{})
+
+	postprocessMessage(&discoverDTO)
+	go propagateMessageAsync(&discoverDTO)
 }
 
 func registerServiceHandler(w http.ResponseWriter, r *http.Request) {
@@ -173,8 +169,17 @@ func registerServiceHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	servicesTable.AddService(serviceId, archimedesId, api.DefaultHostPort, service, map[string][]string{},
-		map[string]*api.Instance{}, 0, maxHops, 0)
+	newTableEntry := &api.ServicesTableEntryDTO{
+		Host:         archimedesId,
+		HostAddr:     api.DefaultHostPort,
+		Service:      service,
+		Instances:    map[string]*api.Instance{},
+		NumberOfHops: 0,
+		MaxHops:      0,
+		Version:      0,
+	}
+
+	servicesTable.AddService(serviceId, newTableEntry)
 	sendServicesTable()
 
 	log.Debugf("added service %s", serviceId)
@@ -478,6 +483,33 @@ func changeInstanceStateHandler(w http.ResponseWriter, r *http.Request) {
 	panic("implement me")
 }
 
+func preprocessMessage(remoteAddr string, discoverMsg *api.DiscoverDTO) {
+	for _, entry := range discoverMsg.Entries {
+		if entry.Host == discoverMsg.NeighborSent {
+			entry.HostAddr = remoteAddr
+			for _, instance := range entry.Instances {
+				instance.Ip = remoteAddr
+			}
+		}
+	}
+}
+
+func postprocessMessage(discoverMsg *api.DiscoverDTO) {
+	servicesToDelete := []string{}
+
+	for serviceId, entry := range discoverMsg.Entries {
+		if entry.NumberOfHops > maxHops {
+			servicesToDelete = append(servicesToDelete, serviceId)
+		}
+	}
+
+	for _, serviceToDelete := range servicesToDelete {
+		delete(discoverMsg.Entries, serviceToDelete)
+	}
+
+	discoverMsg.NeighborSent = archimedesId
+}
+
 func sendServicesTable() {
 	discoverMsg := servicesTable.ToDiscoverMsg(archimedesId)
 
@@ -511,7 +543,7 @@ func removeInstance(serviceId, instanceId string) {
 	heartbeatsMap.Delete(instanceId)
 }
 
-func propagateMessageAsync(neighborSent string, discover api.DiscoverDTO) {
+func propagateMessageAsync(discover *api.DiscoverDTO) {
 	randInt := rand.Intn(500)
 	time.Sleep(time.Duration(randInt) * time.Millisecond)
 
@@ -520,12 +552,12 @@ func propagateMessageAsync(neighborSent string, discover api.DiscoverDTO) {
 	neighbors.Range(func(key, value interface{}) bool {
 		neighborId := key.(typeNeighborsMapKey)
 
-		if neighborId == discover.Host {
+		if neighborId == discover.NeighborSent {
 			log.Debugf("not propagating message %s due to %s being the host", discover.MessageId, neighborId)
 			return true
 		}
 
-		if neighborId == neighborSent {
+		if neighborId == discover.NeighborSent {
 			log.Debugf("not propagating message %s due to %s being the neighbor that i received from",
 				discover.MessageId, neighborId)
 			return true
@@ -533,7 +565,7 @@ func propagateMessageAsync(neighborSent string, discover api.DiscoverDTO) {
 
 		neighbor := value.(typeNeighborsMapValue)
 
-		log.Debugf("propagating msg from %s to %s", neighborSent, neighborId)
+		log.Debugf("propagating msg from %s to %s", discover.NeighborSent, neighborId)
 
 		req := http_utils.BuildRequest(http.MethodPost, neighbor.Addr, api.GetDiscoverPath(), discover)
 		status, _ := http_utils.DoRequest(httpClient, req, nil)

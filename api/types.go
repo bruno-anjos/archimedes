@@ -11,9 +11,9 @@ type (
 	TypeInstancesMapValue = *Instance
 
 	Service struct {
-		Id              string
-		Ports           nat.PortSet
-		Version         int
+		Id      string
+		Ports   nat.PortSet
+		Version int
 	}
 )
 

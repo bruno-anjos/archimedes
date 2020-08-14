@@ -32,6 +32,34 @@ func NewTempServiceTableEntry() *ServicesTableEntry {
 	}
 }
 
+func (se *ServicesTableEntry) ToDTO() *api.ServicesTableEntryDTO {
+	instances := map[string]*api.Instance{}
+
+	se.EntryLock.RLock()
+	defer se.EntryLock.RUnlock()
+
+	se.Instances.Range(func(key, value interface{}) bool {
+		instanceId := key.(typeInstancesMapKey)
+		instance := value.(typeInstancesMapValue)
+
+		instanceCopy := *instance
+		instanceCopy.Local = false
+		instances[instanceId] = &instanceCopy
+
+		return true
+	})
+
+	return &api.ServicesTableEntryDTO{
+		Host:         se.Host.ArchimedesId,
+		HostAddr:     se.Host.Addr,
+		Service:      se.Service,
+		Instances:    instances,
+		NumberOfHops: se.NumberOfHops,
+		MaxHops:      se.MaxHops,
+		Version:      se.Version,
+	}
+}
+
 type (
 	ServicesTable struct {
 		addLock              sync.Mutex
@@ -59,9 +87,7 @@ func NewServicesTable() *ServicesTable {
 	}
 }
 
-func (st *ServicesTable) UpdateService(serviceId, host, hostAddr string, service *api.Service,
-	serviceToInstances map[string][]string, instances map[string]*api.Instance, numberOfHops, maxHops,
-	version int) bool {
+func (st *ServicesTable) UpdateService(serviceId string, newEntry *api.ServicesTableEntryDTO) bool {
 
 	value, ok := st.servicesMap.Load(serviceId)
 	if !ok {
@@ -72,7 +98,7 @@ func (st *ServicesTable) UpdateService(serviceId, host, hostAddr string, service
 	entry.EntryLock.RLock()
 
 	// ignore messages with no new information
-	if version <= entry.Version {
+	if newEntry.Version <= entry.Version {
 		log.Debug("discarding message due to version being older or equal")
 		return false
 	}
@@ -83,14 +109,14 @@ func (st *ServicesTable) UpdateService(serviceId, host, hostAddr string, service
 
 	// message is fresher, comes from the closest neighbor or closer and it has new information
 	entry.Host = &Neighbor{
-		ArchimedesId: host,
-		Addr:         hostAddr,
+		ArchimedesId: newEntry.Host,
+		Addr:         newEntry.HostAddr,
 	}
-	entry.Service = service
+	entry.Service = newEntry.Service
 
 	entry.Instances.Range(func(key, value interface{}) bool {
 		instanceId := key.(typeInstancesMapKey)
-		_, ok = instances[instanceId]
+		_, ok = newEntry.Instances[instanceId]
 		if !ok {
 			st.instancesMap.Delete(instanceId)
 		}
@@ -99,31 +125,23 @@ func (st *ServicesTable) UpdateService(serviceId, host, hostAddr string, service
 	})
 
 	newInstancesMap := &sync.Map{}
-	thisServiceInstances := serviceToInstances[serviceId]
-	for _, instanceId := range thisServiceInstances {
-		instance := instances[instanceId]
-		if !instance.Local {
-			instance.Ip = hostAddr
-		}
+	for instanceId, instance := range newEntry.Instances {
 		newInstancesMap.Store(instanceId, instance)
 		st.instancesMap.Store(instanceId, instance)
 	}
 
 	entry.Instances = newInstancesMap
-	entry.NumberOfHops = numberOfHops
-	entry.Version = version
+	entry.NumberOfHops = newEntry.NumberOfHops
+	entry.Version = newEntry.Version
 	entry.MaxHops = maxHops
 
 	log.Debugf("updated service %s table entry to: %+v", serviceId, entry)
-	log.Debugf("with instances %+v", instances)
+	log.Debugf("with instances %+v", newEntry.Instances)
 
 	return true
 }
 
-func (st *ServicesTable) AddService(serviceId string, host, hostAddr string, service *api.Service,
-	serviceToInstances map[string][]string, instances map[string]*api.Instance, numberOfHops, maxHops,
-	version int) (added bool) {
-
+func (st *ServicesTable) AddService(serviceId string, newEntry *api.ServicesTableEntryDTO) (added bool) {
 	_, ok := st.servicesMap.Load(serviceId)
 	if ok {
 		added = false
@@ -145,35 +163,30 @@ func (st *ServicesTable) AddService(serviceId string, host, hostAddr string, ser
 	st.addLock.Unlock()
 
 	newTableEntry.Host = &Neighbor{
-		ArchimedesId: host,
-		Addr:         hostAddr,
+		ArchimedesId: newEntry.Host,
+		Addr:         newEntry.HostAddr,
 	}
-	newTableEntry.Service = service
+	newTableEntry.Service = newEntry.Service
 
 	newInstancesMap := &sync.Map{}
-	thisServiceInstances := serviceToInstances[serviceId]
-	for _, instanceId := range thisServiceInstances {
-		instance := instances[instanceId]
-		if !instance.Local {
-			instance.Ip = hostAddr
-		}
+	for instanceId, instance := range newEntry.Instances {
 		newInstancesMap.Store(instanceId, instance)
 		st.instancesMap.Store(instanceId, instance)
 	}
 
 	newTableEntry.Instances = newInstancesMap
-	newTableEntry.NumberOfHops = numberOfHops
+	newTableEntry.NumberOfHops = newEntry.NumberOfHops
+	newTableEntry.Version = newEntry.Version
 	newTableEntry.MaxHops = maxHops
-	newTableEntry.Version = version
 
 	servicesMap := &sync.Map{}
 	servicesMap.Store(serviceId, struct{}{})
-	st.neighborsServicesMap.Store(host, servicesMap)
+	st.neighborsServicesMap.Store(newEntry.Host, servicesMap)
 
 	added = true
 
 	log.Debugf("added new table entry for service %s: %+v", serviceId, newTableEntry)
-	log.Debugf("with instances %+v", instances)
+	log.Debugf("with instances %+v", newEntry.Instances)
 
 	return
 }
@@ -329,39 +342,24 @@ func (st *ServicesTable) UpdateTableWithDiscoverMessage(neighbor string, discove
 
 	changed = false
 
-	var (
-		host, hostAddr          string
-		serviceToInstances      map[string][]string
-		instances               map[string]*api.Instance
-		hops, sMaxHops, version int
-	)
-
-	for serviceId, service := range discoverMsg.Services {
+	for serviceId, entry := range discoverMsg.Entries {
 		log.Debugf("%s has service %s", neighbor, serviceId)
 
-		if discoverMsg.Host == archimedesId {
+		if entry.Host == archimedesId {
 			continue
 		}
-
-		host = discoverMsg.Host
-		hostAddr = discoverMsg.HostAddr
-		instances = discoverMsg.Instances
-		hops = discoverMsg.Hops
-		sMaxHops = discoverMsg.MaxHops
-		version = service.Version
-		serviceToInstances = discoverMsg.ServiceToInstances
 
 		_, ok := st.servicesMap.Load(serviceId)
 		if ok {
 			log.Debugf("service %s already existed, updating", serviceId)
-			updated := st.UpdateService(serviceId, host, hostAddr, service, serviceToInstances, instances, hops,
-				sMaxHops, version)
+			updated := st.UpdateService(serviceId, entry)
 			if updated {
 				changed = true
 			}
+			continue
 		}
 
-		st.AddService(serviceId, host, hostAddr, service, serviceToInstances, instances, hops, sMaxHops, version)
+		st.AddService(serviceId, entry)
 		changed = true
 	}
 
@@ -369,45 +367,32 @@ func (st *ServicesTable) UpdateTableWithDiscoverMessage(neighbor string, discove
 }
 
 func (st *ServicesTable) ToDiscoverMsg(archimedesId string) *api.DiscoverDTO {
-	var (
-		services           map[string]*api.Service
-		serviceToInstances map[string][]string
-		instances          map[string]*api.Instance
-	)
-
-	services = map[string]*api.Service{}
-	serviceToInstances = map[string][]string{}
-	instances = map[string]*api.Instance{}
+	entries := map[string]*api.ServicesTableEntryDTO{}
 
 	st.servicesMap.Range(func(key, value interface{}) bool {
 		serviceId := key.(typeServicesTableMapKey)
 		entry := value.(typeServicesTableMapValue)
 
 		entry.EntryLock.RLock()
+
+		if entry.NumberOfHops+1 > maxHops {
+			return true
+		}
+
 		defer entry.EntryLock.RUnlock()
 
-		services[serviceId] = entry.Service
-		entry.Instances.Range(func(key, value interface{}) bool {
-			instanceId := key.(typeInstancesMapKey)
-			instance := value.(typeInstancesMapValue)
-			serviceToInstances[serviceId] = append(serviceToInstances[serviceId], instanceId)
-			instanceCopy := *instance
-			instanceCopy.Local = false
-			instances[instanceId] = &instanceCopy
-			return true
-		})
+		entryDTO := entry.ToDTO()
+		entryDTO.NumberOfHops++
+
+		entries[serviceId] = entryDTO
 
 		return true
 	})
 
 	return &api.DiscoverDTO{
-		MessageId:          uuid.New(),
-		Host:               archimedesId,
-		Services:           services,
-		ServiceToInstances: serviceToInstances,
-		Instances:          instances,
-		Hops:               0,
-		MaxHops:            maxHops,
+		MessageId:    uuid.New(),
+		NeighborSent: archimedesId,
+		Entries:      entries,
 	}
 }
 
