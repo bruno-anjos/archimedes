@@ -506,8 +506,6 @@ func postprocessMessage(discoverMsg *api.DiscoverDTO) {
 	for _, serviceToDelete := range servicesToDelete {
 		delete(discoverMsg.Entries, serviceToDelete)
 	}
-
-	discoverMsg.NeighborSent = archimedesId
 }
 
 func sendServicesTable() {
@@ -547,17 +545,18 @@ func propagateMessageAsync(discover *api.DiscoverDTO) {
 	randInt := rand.Intn(500)
 	time.Sleep(time.Duration(randInt) * time.Millisecond)
 
+	originalNeighborSent := discover.NeighborSent
 	discover.NeighborSent = archimedesId
 
 	neighbors.Range(func(key, value interface{}) bool {
 		neighborId := key.(typeNeighborsMapKey)
 
-		if neighborId == discover.NeighborSent {
+		if neighborId == discover.Origin {
 			log.Debugf("not propagating message %s due to %s being the host", discover.MessageId, neighborId)
 			return true
 		}
 
-		if neighborId == discover.NeighborSent {
+		if neighborId == originalNeighborSent {
 			log.Debugf("not propagating message %s due to %s being the neighbor that i received from",
 				discover.MessageId, neighborId)
 			return true

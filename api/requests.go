@@ -25,6 +25,7 @@ type ServicesTableEntryDTO struct {
 }
 type DiscoverDTO struct {
 	MessageId    uuid.UUID
+	Origin       string
 	NeighborSent string
 	Entries      map[string]*ServicesTableEntryDTO
 }

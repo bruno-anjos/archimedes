@@ -391,6 +391,7 @@ func (st *ServicesTable) ToDiscoverMsg(archimedesId string) *api.DiscoverDTO {
 
 	return &api.DiscoverDTO{
 		MessageId:    uuid.New(),
+		Origin:       archimedesId,
 		NeighborSent: archimedesId,
 		Entries:      entries,
 	}
