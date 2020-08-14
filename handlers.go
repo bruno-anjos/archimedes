@@ -160,7 +160,6 @@ func registerServiceHandler(w http.ResponseWriter, r *http.Request) {
 	service := &api.Service{
 		Id:      serviceId,
 		Ports:   serviceDTO.Ports,
-		Version: 0,
 	}
 
 	_, ok := servicesTable.GetService(serviceId)

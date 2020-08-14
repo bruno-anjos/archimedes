@@ -13,7 +13,6 @@ type (
 	Service struct {
 		Id      string
 		Ports   nat.PortSet
-		Version int
 	}
 )
 
@@ -21,7 +20,6 @@ func (s *Service) ToTransfarable() *Service {
 	return &Service{
 		Id:      s.Id,
 		Ports:   s.Ports,
-		Version: s.Version,
 	}
 }
 

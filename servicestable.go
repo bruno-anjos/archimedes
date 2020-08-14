@@ -258,7 +258,7 @@ func (st *ServicesTable) AddInstance(serviceId, instanceId string, instance *api
 	defer entry.EntryLock.Unlock()
 
 	entry.Instances.Store(instanceId, instance)
-	entry.Service.Version++
+	entry.Version++
 
 	st.instancesMap.Store(instanceId, instance)
 
