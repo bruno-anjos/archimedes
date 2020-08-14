@@ -109,6 +109,7 @@ func (st *ServicesTable) UpdateService(serviceId, host, hostAddr string, service
 	entry.MaxHops = maxHops
 
 	log.Debugf("updated service %s table entry to: %+v", serviceId, entry)
+	log.Debugf("with instances %+v", instances)
 
 	return true
 }
@@ -160,6 +161,7 @@ func (st *ServicesTable) AddService(serviceId string, host, hostAddr string, ser
 	added = true
 
 	log.Debugf("added new table entry for service %s: %+v", serviceId, newTableEntry)
+	log.Debugf("with instances %+v", instances)
 
 	return
 }
