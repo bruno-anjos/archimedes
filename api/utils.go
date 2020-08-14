@@ -35,7 +35,7 @@ func ResolveServiceInArchimedes(httpClient *http.Client, hostPort string) (resol
 		Host: host,
 		Port: nat.Port(port + "/tcp"),
 	}
-	archReq := http_utils.BuildRequest(http.MethodGet, DefaultHostPort, GetResolvePath(), toResolve)
+	archReq := http_utils.BuildRequest(http.MethodPost, DefaultHostPort, GetResolvePath(), toResolve)
 
 	resolved := ResolvedDTO{}
 	status, _ := http_utils.DoRequest(httpClient, archReq, &resolved)
