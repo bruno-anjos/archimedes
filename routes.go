@@ -11,12 +11,9 @@ import (
 // Route names
 const (
 	registerServiceName                  = "REGISTER_SERVICE"
-	addNeighborName                      = "ADD_NEIGHBOR"
 	deleteServiceName                    = "DELETE_SERVICE"
-	registerServiceInstanceName          = "REGISTER_SERVICE"
-	registerHeartbeatServiceInstanceName = "REGISTER_HEARTBEAT"
+	registerServiceInstanceName          = "REGISTER_SERVICE_INSTANCE"
 	deleteServiceInstanceName            = "DELETE_SERVICE_INSTANCE"
-	heartbeatServiceInstanceName         = "HEARTBEAT_SERVICE_INSTANCE"
 	getAllServicesName                   = "GET_ALL_SERVICES"
 	getAllServiceInstancesName           = "GET_ALL_SERVICE_INSTANCES"
 	getServiceInstanceName               = "GET_SERVICE_INSTANCE"
@@ -42,11 +39,8 @@ var (
 	serviceRoute         = fmt.Sprintf(api.ServicePath, _serviceIdPathVarFormatted)
 	serviceInstanceRoute = fmt.Sprintf(api.ServiceInstancePath, _serviceIdPathVarFormatted,
 		_instanceIdPathVarFormatted)
-	serviceInstanceAliveRoute = fmt.Sprintf(api.ServiceInstanceAlivePath, _serviceIdPathVarFormatted,
-		_instanceIdPathVarFormatted)
 	instanceRoute  = fmt.Sprintf(api.InstancePath, _instanceIdPathVarFormatted)
 	discoverRoute  = api.DiscoverPath
-	neighborRoute  = api.NeighborPath
 	whoAreYouRoute = api.WhoAreYouPath
 	tableRoute     = api.TablePath
 	resolveRoute   = api.ResolvePath
@@ -90,20 +84,6 @@ var routes = []http_utils.Route{
 	},
 
 	{
-		Name:        heartbeatServiceInstanceName,
-		Method:      http.MethodPut,
-		Pattern:     serviceInstanceRoute,
-		HandlerFunc: heartbeatServiceInstanceHandler,
-	},
-
-	{
-		Name:        registerHeartbeatServiceInstanceName,
-		Method:      http.MethodPost,
-		Pattern:     serviceInstanceAliveRoute,
-		HandlerFunc: registerHeartbeatServiceInstanceHandler,
-	},
-
-	{
 		Name:        getAllServicesName,
 		Method:      http.MethodGet,
 		Pattern:     servicesRoute,
@@ -136,13 +116,6 @@ var routes = []http_utils.Route{
 		Method:      http.MethodPost,
 		Pattern:     discoverRoute,
 		HandlerFunc: discoverHandler,
-	},
-
-	{
-		Name:        addNeighborName,
-		Method:      http.MethodPost,
-		Pattern:     neighborRoute,
-		HandlerFunc: addNeighborHandler,
 	},
 
 	{

@@ -4,13 +4,14 @@ import (
 	"sync"
 
 	"github.com/bruno-anjos/archimedes/api"
+	genericutils "github.com/bruno-anjos/solution-utils"
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 )
 
 type (
 	ServicesTableEntry struct {
-		Host         *Neighbor
+		Host         *genericutils.Node
 		Service      *api.Service
 		Instances    *sync.Map
 		NumberOfHops int
@@ -50,7 +51,7 @@ func (se *ServicesTableEntry) ToDTO() *api.ServicesTableEntryDTO {
 	})
 
 	return &api.ServicesTableEntryDTO{
-		Host:         se.Host.ArchimedesId,
+		Host:         se.Host.Id,
 		HostAddr:     se.Host.Addr,
 		Service:      se.Service,
 		Instances:    instances,
@@ -109,9 +110,9 @@ func (st *ServicesTable) UpdateService(serviceId string, newEntry *api.ServicesT
 	defer entry.EntryLock.Unlock()
 
 	// message is fresher, comes from the closest neighbor or closer and it has new information
-	entry.Host = &Neighbor{
-		ArchimedesId: newEntry.Host,
-		Addr:         newEntry.HostAddr,
+	entry.Host = &genericutils.Node{
+		Id:   newEntry.Host,
+		Addr: newEntry.HostAddr,
 	}
 	entry.Service = newEntry.Service
 
@@ -163,9 +164,9 @@ func (st *ServicesTable) AddService(serviceId string, newEntry *api.ServicesTabl
 	st.servicesMap.Store(serviceId, newTableEntry)
 	st.addLock.Unlock()
 
-	newTableEntry.Host = &Neighbor{
-		ArchimedesId: newEntry.Host,
-		Addr:         newEntry.HostAddr,
+	newTableEntry.Host = &genericutils.Node{
+		Id:   newEntry.Host,
+		Addr: newEntry.HostAddr,
 	}
 	newTableEntry.Service = newEntry.Service
 
@@ -294,6 +295,9 @@ func (st *ServicesTable) GetServiceInstance(serviceId, instanceId string) (*api.
 	defer entry.EntryLock.RUnlock()
 
 	value, ok = entry.Instances.Load(instanceId)
+	if !ok {
+		return nil, false
+	}
 
 	return value.(typeInstancesMapValue), ok
 }
@@ -332,13 +336,24 @@ func (st *ServicesTable) DeleteInstance(serviceId, instanceId string) {
 		entry := value.(typeServicesTableMapValue)
 		entry.EntryLock.RLock()
 		entry.Instances.Delete(instanceId)
+		numInstances := 0
+		entry.Instances.Range(func(key, value interface{}) bool {
+			numInstances++
+			return true
+		})
+
+		if numInstances == 0 {
+			log.Debugf("no instances left, deleting service %s", serviceId)
+			defer st.DeleteService(serviceId)
+		}
+
 		entry.EntryLock.RUnlock()
 	}
 
 	st.instancesMap.Delete(instanceId)
 }
 
-func (st *ServicesTable) UpdateTableWithDiscoverMessage(neighbor string, discoverMsg *api.DiscoverDTO) (changed bool) {
+func (st *ServicesTable) UpdateTableWithDiscoverMessage(neighbor string, discoverMsg *api.DiscoverMsg) (changed bool) {
 	log.Debugf("updating table from message %s", discoverMsg.MessageId.String())
 
 	changed = false
@@ -367,7 +382,7 @@ func (st *ServicesTable) UpdateTableWithDiscoverMessage(neighbor string, discove
 	return changed
 }
 
-func (st *ServicesTable) ToDiscoverMsg(archimedesId string) *api.DiscoverDTO {
+func (st *ServicesTable) ToDiscoverMsg(archimedesId string) *api.DiscoverMsg {
 	entries := map[string]*api.ServicesTableEntryDTO{}
 
 	st.servicesMap.Range(func(key, value interface{}) bool {
@@ -394,7 +409,7 @@ func (st *ServicesTable) ToDiscoverMsg(archimedesId string) *api.DiscoverDTO {
 		return nil
 	}
 
-	return &api.DiscoverDTO{
+	return &api.DiscoverMsg{
 		MessageId:    uuid.New(),
 		Origin:       archimedesId,
 		NeighborSent: archimedesId,

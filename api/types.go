@@ -1,8 +1,6 @@
 package api
 
 import (
-	"sync"
-
 	"github.com/docker/go-connections/nat"
 )
 
@@ -55,10 +53,4 @@ func FromTransfarableInstance(i *Instance, originIp string) *Instance {
 		Static:          i.Static,
 		Local:           false,
 	}
-}
-
-type PairServiceIdStatus struct {
-	ServiceId string
-	IsUp      bool
-	Mutex     *sync.Mutex
 }

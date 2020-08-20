@@ -9,12 +9,6 @@ type ServiceDTO struct {
 	Ports nat.PortSet
 }
 
-type InstanceDTO struct {
-	Static          bool
-	PortTranslation nat.PortMap `json:"port_translation"`
-	Local           bool
-}
-
 type ServicesTableEntryDTO struct {
 	Host, HostAddr string
 	Service        *Service
@@ -23,7 +17,7 @@ type ServicesTableEntryDTO struct {
 	MaxHops        int
 	Version        int
 }
-type DiscoverDTO struct {
+type DiscoverMsg struct {
 	MessageId    uuid.UUID
 	Origin       string
 	NeighborSent string

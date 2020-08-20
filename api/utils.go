@@ -5,17 +5,11 @@ import (
 	"fmt"
 	"net"
 	"net/http"
-	"os"
 	"time"
 
-	genericutils "github.com/bruno-anjos/solution-utils"
 	"github.com/bruno-anjos/solution-utils/http_utils"
 	"github.com/docker/go-connections/nat"
 	log "github.com/sirupsen/logrus"
-)
-
-const (
-	HeartbeatCheckerTimeout = 60
 )
 
 func ResolveServiceInArchimedes(httpClient *http.Client, hostPort string) (string, error) {
@@ -55,45 +49,4 @@ func ResolveServiceInArchimedes(httpClient *http.Client, hostPort string) (strin
 	log.Debugf("resolved %s to %s", hostPort, resolvedHostPort)
 
 	return resolvedHostPort, nil
-}
-
-func SendHeartbeatInstanceToArchimedes(archimedesHostPort string) {
-	serviceId := os.Getenv(genericutils.ServiceEnvVarName)
-	instanceId := os.Getenv(genericutils.InstanceEnvVarName)
-
-	httpClient := &http.Client{
-		Timeout: 10 * time.Second,
-	}
-
-	log.Infof("will start sending heartbeats to %s as %s from %s", archimedesHostPort, instanceId, serviceId)
-
-	serviceInstanceAlivePath := GetServiceInstanceAlivePath(serviceId, instanceId)
-	req := http_utils.BuildRequest(http.MethodPost, archimedesHostPort, serviceInstanceAlivePath, nil)
-	status, _ := http_utils.DoRequest(httpClient, req, nil)
-
-	switch status {
-	case http.StatusConflict:
-		log.Debugf("service %s instance %s already has a heartbeat sender", serviceId, instanceId)
-		return
-	case http.StatusOK:
-	default:
-		panic(errors.New(fmt.Sprintf("received unexpected status %d", status)))
-	}
-
-	ticker := time.NewTicker((HeartbeatCheckerTimeout / 3) * time.Second)
-	serviceInstancePath := GetServiceInstancePath(serviceId, instanceId)
-	req = http_utils.BuildRequest(http.MethodPut, archimedesHostPort, serviceInstancePath, nil)
-	for {
-		<-ticker.C
-		log.Info("sending heartbeat to archimedes")
-		status, _ = http_utils.DoRequest(httpClient, req, nil)
-
-		switch status {
-		case http.StatusNotFound:
-			log.Warnf("heartbeat to archimedes retrieved not found")
-		case http.StatusOK:
-		default:
-			panic(errors.New(fmt.Sprintf("received unexpected status %d", status)))
-		}
-	}
 }

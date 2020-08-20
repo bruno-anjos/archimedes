@@ -12,6 +12,7 @@ require (
 )
 
 replace (
+	github.com/bruno-anjos/deployer v0.0.1 => ./../deployer
 	github.com/bruno-anjos/scheduler v0.0.1 => ./../scheduler
 	github.com/bruno-anjos/solution-utils v0.0.1 => ./../solution-utils
 )
