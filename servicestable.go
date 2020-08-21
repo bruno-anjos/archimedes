@@ -110,10 +110,7 @@ func (st *ServicesTable) UpdateService(serviceId string, newEntry *api.ServicesT
 	defer entry.EntryLock.Unlock()
 
 	// message is fresher, comes from the closest neighbor or closer and it has new information
-	entry.Host = &genericutils.Node{
-		Id:   newEntry.Host,
-		Addr: newEntry.HostAddr,
-	}
+	entry.Host = genericutils.NewNode(newEntry.Host, newEntry.HostAddr)
 	entry.Service = newEntry.Service
 
 	entry.Instances.Range(func(key, value interface{}) bool {
@@ -164,10 +161,7 @@ func (st *ServicesTable) AddService(serviceId string, newEntry *api.ServicesTabl
 	st.servicesMap.Store(serviceId, newTableEntry)
 	st.addLock.Unlock()
 
-	newTableEntry.Host = &genericutils.Node{
-		Id:   newEntry.Host,
-		Addr: newEntry.HostAddr,
-	}
+	newTableEntry.Host = genericutils.NewNode(newEntry.Host, newEntry.HostAddr)
 	newTableEntry.Service = newEntry.Service
 
 	newInstancesMap := &sync.Map{}
